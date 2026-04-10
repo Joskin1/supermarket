@@ -36,6 +36,7 @@ ddev npm run build
 ```bash
 ddev exec php artisan migrate
 ddev exec php artisan db:seed
+ddev exec php artisan db:seed --class=InventoryDevelopmentSeeder
 ddev exec php artisan test
 ddev npm run dev
 ```
@@ -52,6 +53,35 @@ ddev npm run dev
 - `admin`: operational access for the supermarket owner
 
 Only `sudo` users can manage users in Filament.
+
+Both `sudo` and `admin` users can access the inventory dashboard, categories, products, and stock entries.
+
+## Inventory Workflow
+
+Phase 2 introduces the inventory core inside Filament:
+
+- `Categories`: top-level product groupings such as Cosmetics, Toiletries, and Beverages
+- `Products`: create each sellable item once with SKU, prices, reorder level, and tracked current stock
+- `Stock Entries`: replenish an existing product by searching for it and adding new quantity
+
+The intended operating flow is:
+
+1. Create the product once in `Products`.
+2. Reuse that product in `Stock Entries` whenever more quantity is purchased.
+3. Optionally create a missing product inline from the Stock Entry form.
+4. Watch low-stock and out-of-stock states from the dashboard and product table.
+
+`current_stock` is stored on the `products` table for fast reads, while every replenishment remains preserved in `stock_entries` for history and future Excel-driven workflows.
+
+## Development Inventory Seeder
+
+For realistic local data, run:
+
+```bash
+ddev exec php artisan db:seed --class=InventoryDevelopmentSeeder
+```
+
+This optional seeder creates supermarket-style categories, products, and sample stock entries without replacing the default bootstrap seeding.
 
 ## Bootstrap Sudo User
 

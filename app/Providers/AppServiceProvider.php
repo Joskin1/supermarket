@@ -3,7 +3,13 @@
 namespace App\Providers;
 
 use App\Enums\RoleEnum;
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\StockEntry;
 use App\Models\User;
+use App\Policies\CategoryPolicy;
+use App\Policies\ProductPolicy;
+use App\Policies\StockEntryPolicy;
 use App\Policies\UserPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
@@ -55,6 +61,9 @@ class AppServiceProvider extends ServiceProvider
 
     protected function configureAuthorization(): void
     {
+        Gate::policy(Category::class, CategoryPolicy::class);
+        Gate::policy(Product::class, ProductPolicy::class);
+        Gate::policy(StockEntry::class, StockEntryPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
 
         Gate::before(function (User $user, string $ability): ?bool {
