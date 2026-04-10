@@ -5,10 +5,14 @@ namespace App\Providers;
 use App\Enums\RoleEnum;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\SalesImportBatch;
+use App\Models\SalesRecord;
 use App\Models\StockEntry;
 use App\Models\User;
 use App\Policies\CategoryPolicy;
 use App\Policies\ProductPolicy;
+use App\Policies\SalesImportBatchPolicy;
+use App\Policies\SalesRecordPolicy;
 use App\Policies\StockEntryPolicy;
 use App\Policies\UserPolicy;
 use Carbon\CarbonImmutable;
@@ -63,6 +67,8 @@ class AppServiceProvider extends ServiceProvider
     {
         Gate::policy(Category::class, CategoryPolicy::class);
         Gate::policy(Product::class, ProductPolicy::class);
+        Gate::policy(SalesImportBatch::class, SalesImportBatchPolicy::class);
+        Gate::policy(SalesRecord::class, SalesRecordPolicy::class);
         Gate::policy(StockEntry::class, StockEntryPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
 

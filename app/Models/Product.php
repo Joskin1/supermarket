@@ -62,6 +62,11 @@ class Product extends Model
         return $this->hasMany(StockEntry::class);
     }
 
+    public function salesRecords(): HasMany
+    {
+        return $this->hasMany(SalesRecord::class);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);

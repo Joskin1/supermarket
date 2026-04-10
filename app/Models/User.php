@@ -10,6 +10,7 @@ use Filament\Panel;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
@@ -61,5 +62,15 @@ class User extends Authenticatable implements FilamentUser
     public function isAdmin(): bool
     {
         return $this->hasRole(RoleEnum::ADMIN->value);
+    }
+
+    public function uploadedSalesImportBatches(): HasMany
+    {
+        return $this->hasMany(SalesImportBatch::class, 'uploaded_by');
+    }
+
+    public function salesRecords(): HasMany
+    {
+        return $this->hasMany(SalesRecord::class, 'created_by');
     }
 }
