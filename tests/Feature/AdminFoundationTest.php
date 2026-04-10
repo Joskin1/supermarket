@@ -44,6 +44,12 @@ class AdminFoundationTest extends TestCase
         $this->assertFalse($user->canAccessPanel(Filament::getPanel('admin')));
     }
 
+    public function test_panel_password_reset_screen_can_be_rendered(): void
+    {
+        $this->get('/admin/password-reset/request')
+            ->assertOk();
+    }
+
     public function test_only_sudo_users_can_manage_users(): void
     {
         $this->seed();

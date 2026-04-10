@@ -26,6 +26,7 @@ class UserForm
                             ->email()
                             ->required()
                             ->maxLength(255)
+                            ->helperText('A verification email will be sent when a new user is created or when this address is changed. The user must verify the address before signing in.')
                             ->unique(ignoreRecord: true),
                         Select::make('role')
                             ->options(RoleEnum::options())

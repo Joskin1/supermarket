@@ -21,6 +21,11 @@ class UsersTable
                 TextColumn::make('email')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('email_verified_at')
+                    ->label('Verification')
+                    ->state(fn (User $record): string => $record->hasVerifiedEmail() ? 'Verified' : 'Pending verification')
+                    ->badge()
+                    ->color(fn (User $record): string => $record->hasVerifiedEmail() ? 'success' : 'warning'),
                 TextColumn::make('role')
                     ->label('Role')
                     ->state(fn (User $record): string => $record->getRoleNames()
