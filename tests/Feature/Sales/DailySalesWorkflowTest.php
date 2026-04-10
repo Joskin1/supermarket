@@ -7,14 +7,11 @@ use App\Actions\Sales\ProcessSalesImportAction;
 use App\Enums\RoleEnum;
 use App\Enums\SalesImportBatchStatus;
 use App\Exports\DailySalesTemplateExport;
-use App\Filament\Pages\DailySalesExport;
-use App\Filament\Resources\SalesImportBatches\SalesImportBatchResource;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
 use App\Support\SalesImport\DailySalesTemplateColumns;
 use Database\Seeders\RoleSeeder;
-use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
@@ -209,33 +206,34 @@ class DailySalesWorkflowTest extends TestCase
         $this->assertSame('1500.00', $processed->total_sales_amount);
     }
 
-    public function test_sales_import_batches_are_accessible_to_admin_and_sudo(): void
+    public function test_sales_import_batches_are_accessible_to_admin_users(): void
     {
         $this->seed();
+        $admin = $this->makeAdmin();
 
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->actingAs($admin);
 
-        $admin = User::factory()->create();
-        $admin->assignRole(RoleEnum::ADMIN->value);
+        $this->get('/admin/sales-import-batches')
+            ->assertOk();
+
+        $this->get('/admin/daily-sales-export')
+            ->assertOk();
+    }
+
+    public function test_sales_import_batches_are_accessible_to_sudo_users(): void
+    {
+        $this->seed();
 
         $sudo = User::query()
             ->where('email', env('SUDO_EMAIL', 'akinjoseph221@gmail.com'))
             ->firstOrFail();
 
-        Filament::actingAs($admin);
+        $this->actingAs($sudo);
 
-        $this->get(SalesImportBatchResource::getUrl('index'))
+        $this->get('/admin/sales-import-batches')
             ->assertOk();
 
-        $this->get(DailySalesExport::getUrl())
-            ->assertOk();
-
-        Filament::actingAs($sudo);
-
-        $this->get(SalesImportBatchResource::getUrl('index'))
-            ->assertOk();
-
-        $this->get(DailySalesExport::getUrl())
+        $this->get('/admin/daily-sales-export')
             ->assertOk();
     }
 
@@ -243,13 +241,12 @@ class DailySalesWorkflowTest extends TestCase
     {
         $user = User::factory()->create();
 
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
-        Filament::actingAs($user);
+        $this->actingAs($user);
 
-        $this->get(SalesImportBatchResource::getUrl('index'))
+        $this->get('/admin/sales-import-batches')
             ->assertForbidden();
 
-        $this->get(DailySalesExport::getUrl())
+        $this->get('/admin/daily-sales-export')
             ->assertForbidden();
     }
 
