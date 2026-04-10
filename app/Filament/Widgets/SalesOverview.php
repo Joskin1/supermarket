@@ -2,7 +2,6 @@
 
 namespace App\Filament\Widgets;
 
-use App\Enums\SalesImportBatchStatus;
 use App\Models\SalesImportBatch;
 use App\Models\SalesRecord;
 use Filament\Widgets\StatsOverviewWidget;
@@ -14,42 +13,36 @@ class SalesOverview extends StatsOverviewWidget
 
     protected function getStats(): array
     {
-        $today = now()->toDateString();
-
-        $salesToday = SalesRecord::query()
-            ->whereDate('sales_date', $today);
-
-        $totalSalesAmountToday = (float) $salesToday->sum('total_amount');
-        $totalQuantityToday = (int) $salesToday->sum('quantity_sold');
-        $totalRowsToday = (int) $salesToday->count();
-
-        $batchesToday = SalesImportBatch::query()
-            ->whereDate('created_at', $today);
-
-        $failedBatchesToday = (int) (clone $batchesToday)
-            ->where('status', SalesImportBatchStatus::FAILED->value)
+        $today = today();
+        $salesImportedToday = SalesRecord::query()
+            ->whereDate('created_at', $today)
             ->count();
-
-        $batchesWithFailuresToday = (int) (clone $batchesToday)
-            ->where('status', SalesImportBatchStatus::PROCESSED_WITH_FAILURES->value)
+        $quantitySoldToday = (int) SalesRecord::query()
+            ->whereDate('sales_date', $today)
+            ->sum('quantity_sold');
+        $amountSoldToday = (float) SalesRecord::query()
+            ->whereDate('sales_date', $today)
+            ->sum('total_amount');
+        $processedBatchesToday = SalesImportBatch::query()
+            ->whereDate('processed_at', $today)
+            ->count();
+        $batchesWithFailures = SalesImportBatch::query()
+            ->where('failed_rows', '>', 0)
             ->count();
 
         return [
-            Stat::make('Sales Today', number_format($totalSalesAmountToday, 2).' NGN')
-                ->description('Total value imported for today')
+            Stat::make('Sales Imported Today', number_format($salesImportedToday))
+                ->description('Rows successfully imported today')
                 ->color('success'),
-            Stat::make('Quantity Sold Today', number_format($totalQuantityToday))
-                ->description('Total units sold from imported rows')
+            Stat::make('Total Quantity Sold Today', number_format($quantitySoldToday))
+                ->description('Units sold for sales dated '.$today->format('Y-m-d'))
                 ->color('info'),
-            Stat::make('Sales Rows Today', number_format($totalRowsToday))
-                ->description('Imported sales rows for today')
+            Stat::make('Total Amount Sold Today', 'NGN '.number_format($amountSoldToday, 2))
+                ->description('Gross sales value for today\'s sales date')
                 ->color('primary'),
-            Stat::make('Failed Imports Today', number_format($failedBatchesToday))
-                ->description('Batches that could not be processed')
-                ->color('danger'),
-            Stat::make('Batches With Failures Today', number_format($batchesWithFailuresToday))
-                ->description('Batches that imported with row errors')
-                ->color('warning'),
+            Stat::make('Batches With Failures', number_format($batchesWithFailures))
+                ->description(number_format($processedBatchesToday).' batches processed today')
+                ->color($batchesWithFailures > 0 ? 'warning' : 'success'),
         ];
     }
 }

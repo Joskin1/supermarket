@@ -6,6 +6,7 @@ use App\Models\SalesRecord;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\Summarizers\Sum;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -16,7 +17,7 @@ class SalesRecordsTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->query(fn (): Builder => SalesRecord::query()->with(['batch', 'product']))
+            ->query(fn (): Builder => SalesRecord::query()->with(['batch', 'creator']))
             ->defaultSort('sales_date', 'desc')
             ->columns([
                 TextColumn::make('sales_date')
@@ -29,11 +30,12 @@ class SalesRecordsTable
                 TextColumn::make('product_name_snapshot')
                     ->label('Product')
                     ->searchable()
+                    ->description(fn (SalesRecord $record): ?string => $record->category_snapshot)
                     ->wrap(),
                 TextColumn::make('category_snapshot')
                     ->label('Category')
                     ->searchable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('unit_price')
                     ->label('Unit price')
                     ->money('NGN')
@@ -41,15 +43,33 @@ class SalesRecordsTable
                 TextColumn::make('quantity_sold')
                     ->label('Qty sold')
                     ->numeric()
+                    ->summarize([
+                        Sum::make()
+                            ->label('Visible total'),
+                    ])
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->label('Total')
                     ->money('NGN')
+                    ->summarize([
+                        Sum::make()
+                            ->label('Visible total')
+                            ->money('NGN'),
+                    ])
                     ->sortable(),
                 TextColumn::make('batch.batch_code')
                     ->label('Batch')
                     ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->copyable()
+                    ->toggleable(),
+                TextColumn::make('creator.name')
+                    ->label('Imported by')
+                    ->placeholder('System')
+                    ->toggleable(),
+                TextColumn::make('note')
+                    ->placeholder('No note')
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->wrap(),
                 TextColumn::make('created_at')
                     ->label('Imported at')
                     ->dateTime()
@@ -83,6 +103,7 @@ class SalesRecordsTable
             ])
             ->recordActions([
                 ViewAction::make(),
-            ]);
+            ])
+            ->toolbarActions([]);
     }
 }

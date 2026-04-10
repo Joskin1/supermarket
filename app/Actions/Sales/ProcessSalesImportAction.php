@@ -2,6 +2,7 @@
 
 namespace App\Actions\Sales;
 
+use App\Actions\Reporting\RefreshAllSummariesAction;
 use App\Enums\SalesImportBatchStatus;
 use App\Imports\SalesImportSpreadsheet;
 use App\Models\SalesImportBatch;
@@ -18,6 +19,7 @@ class ProcessSalesImportAction
     public function __construct(
         protected SalesImportHeadingValidator $headingValidator,
         protected SalesImportRowProcessor $rowProcessor,
+        protected RefreshAllSummariesAction $refreshAllSummaries,
     ) {}
 
     public function execute(SalesImportBatch $batch): SalesImportBatch
@@ -100,6 +102,8 @@ class ProcessSalesImportAction
             'processed_at' => now(),
         ])->save();
 
+        $this->refreshReportingSummaries($batch);
+
         return $batch->fresh(['uploader']);
     }
 
@@ -125,5 +129,35 @@ class ProcessSalesImportAction
         }
 
         return trim($existingNotes."\n\nSystem: ".$systemNote);
+    }
+
+    protected function refreshReportingSummaries(SalesImportBatch $batch): void
+    {
+        if (! in_array($batch->status, [
+            SalesImportBatchStatus::PROCESSED,
+            SalesImportBatchStatus::PROCESSED_WITH_FAILURES,
+        ], true)) {
+            return;
+        }
+
+        if (! $batch->sales_date_from || ! $batch->sales_date_to) {
+            return;
+        }
+
+        try {
+            $this->refreshAllSummaries->forDateRange(
+                $batch->sales_date_from,
+                $batch->sales_date_to,
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+
+            $batch->forceFill([
+                'notes' => $this->mergeNotes(
+                    $batch->notes,
+                    'Reporting summaries were not refreshed automatically. The imported sales are safe, but run "php artisan reports:refresh-summaries --from='.$batch->sales_date_from->toDateString().' --to='.$batch->sales_date_to->toDateString().'" to rebuild the reporting layer.',
+                ),
+            ])->save();
+        }
     }
 }
