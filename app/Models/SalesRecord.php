@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\DateOnlyCast;
 use Database\Factories\SalesRecordFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -32,7 +33,7 @@ class SalesRecord extends Model
             'unit_price' => 'decimal:2',
             'quantity_sold' => 'integer',
             'total_amount' => 'decimal:2',
-            'sales_date' => 'date',
+            'sales_date' => DateOnlyCast::class,
         ];
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\DateOnlyCast;
 use Database\Factories\SalesImportFailureFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -27,7 +28,7 @@ class SalesImportFailure extends Model
         return [
             'raw_row' => 'array',
             'error_messages' => 'array',
-            'sales_date' => 'date',
+            'sales_date' => DateOnlyCast::class,
         ];
     }
 

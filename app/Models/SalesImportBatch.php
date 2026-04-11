@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\DateOnlyCast;
 use App\Enums\SalesImportBatchStatus;
 use Database\Factories\SalesImportBatchFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -37,8 +38,8 @@ class SalesImportBatch extends Model
     {
         return [
             'status' => SalesImportBatchStatus::class,
-            'sales_date_from' => 'date',
-            'sales_date_to' => 'date',
+            'sales_date_from' => DateOnlyCast::class,
+            'sales_date_to' => DateOnlyCast::class,
             'total_rows' => 'integer',
             'successful_rows' => 'integer',
             'failed_rows' => 'integer',

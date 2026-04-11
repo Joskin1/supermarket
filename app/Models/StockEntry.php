@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\DateOnlyCast;
 use Database\Factories\StockEntryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -29,7 +30,7 @@ class StockEntry extends Model
             'quantity_added' => 'integer',
             'unit_cost_price' => 'decimal:2',
             'unit_selling_price' => 'decimal:2',
-            'stock_date' => 'date',
+            'stock_date' => DateOnlyCast::class,
         ];
     }
 
