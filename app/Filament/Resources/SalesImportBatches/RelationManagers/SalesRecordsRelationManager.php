@@ -18,11 +18,19 @@ class SalesRecordsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->defaultSort('sales_date', 'desc')
+            ->defaultSort('source_row_number')
             ->recordTitleAttribute('product_name_snapshot')
             ->columns([
+                TextColumn::make('source_row_number')
+                    ->label('Sheet row')
+                    ->numeric()
+                    ->sortable(),
                 TextColumn::make('sales_date')
                     ->date()
+                    ->sortable(),
+                TextColumn::make('sales_time')
+                    ->label('Sales time')
+                    ->placeholder('Not provided')
                     ->sortable(),
                 TextColumn::make('product_code_snapshot')
                     ->label('Product code')

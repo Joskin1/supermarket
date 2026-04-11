@@ -41,6 +41,24 @@ class DailySalesExport extends Page
         return SalesImportBatchResource::getUrl('create');
     }
 
+    public function getProductReferenceSheetName(): string
+    {
+        return DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET;
+    }
+
+    public function getSalesEntryLogSheetName(): string
+    {
+        return DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function getProductReferenceColumns(): array
+    {
+        return DailySalesTemplateColumns::productReference();
+    }
+
     protected function getHeaderActions(): array
     {
         return [

@@ -3,13 +3,13 @@
 namespace App\Actions\Sales;
 
 use App\Exports\DailySalesTemplateExport;
-use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ExportDailySalesTemplateAction
 {
-    public function download(?CarbonImmutable $salesDate = null): BinaryFileResponse
+    public function download(?CarbonInterface $salesDate = null): BinaryFileResponse
     {
         $date = $salesDate ?? now();
 

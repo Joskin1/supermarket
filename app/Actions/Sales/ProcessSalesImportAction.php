@@ -6,12 +6,14 @@ use App\Actions\Reporting\RefreshAllSummariesAction;
 use App\Enums\SalesImportBatchStatus;
 use App\Imports\SalesImportSpreadsheet;
 use App\Models\SalesImportBatch;
+use App\Support\SalesImport\DailySalesTemplateColumns;
 use App\Support\SalesImport\SalesImportHeadingValidator;
 use App\Support\SalesImport\SalesImportRowProcessor;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
-use Maatwebsite\Excel\HeadingRowImport;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Throwable;
 
 class ProcessSalesImportAction
@@ -59,8 +61,25 @@ class ProcessSalesImportAction
      */
     protected function validateHeadings(SalesImportBatch $batch): void
     {
-        $headingRows = (new HeadingRowImport)->toArray($batch->file_path, 'local');
-        $headings = $headingRows[0][0] ?? [];
+        $path = Storage::disk('local')->path($batch->file_path);
+        $reader = IOFactory::createReaderForFile($path);
+        $reader->setReadDataOnly(true);
+        $spreadsheet = $reader->load($path);
+
+        foreach ([
+            DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET,
+            DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET,
+        ] as $sheetName) {
+            if ($spreadsheet->getSheetByName($sheetName) === null) {
+                throw ValidationException::withMessages([
+                    'file' => 'The uploaded workbook must include both the "Product Reference" and "Sales Entry Log" sheets.',
+                ]);
+            }
+        }
+
+        $headings = $spreadsheet
+            ->getSheetByName(DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET)
+            ?->rangeToArray('A1:H1', null, true, false, false)[0] ?? [];
 
         $this->headingValidator->validate($headings);
     }

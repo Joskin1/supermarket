@@ -20,14 +20,11 @@ class SalesImportBatchForm
                             ->label('Sales file')
                             ->acceptedFileTypes([
                                 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                                'application/vnd.ms-excel',
-                                'text/csv',
-                                'text/plain',
                             ])
                             ->maxSize(10240)
                             ->storeFiles(false)
                             ->required()
-                            ->helperText('Allowed files: .xlsx or .csv, up to 10 MB. Keep the exported columns unchanged for the cleanest import.')
+                            ->helperText('Allowed files: .xlsx only, up to 10 MB. Upload the completed 2-sheet workbook from the Daily Sales Export page.')
                             ->columnSpanFull(),
                         Textarea::make('notes')
                             ->rows(4)

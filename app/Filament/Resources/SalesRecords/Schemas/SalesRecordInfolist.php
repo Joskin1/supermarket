@@ -17,6 +17,9 @@ class SalesRecordInfolist
                         TextEntry::make('sales_date')
                             ->label('Sales date')
                             ->date(),
+                        TextEntry::make('sales_time')
+                            ->label('Sales time')
+                            ->placeholder('Not provided'),
                         TextEntry::make('product_code_snapshot')
                             ->label('Product code')
                             ->copyable(),
@@ -36,6 +39,9 @@ class SalesRecordInfolist
                         TextEntry::make('batch.batch_code')
                             ->label('Batch code')
                             ->copyable(),
+                        TextEntry::make('source_row_number')
+                            ->label('Sheet row')
+                            ->numeric(),
                         TextEntry::make('created_at')
                             ->label('Imported at')
                             ->dateTime(),

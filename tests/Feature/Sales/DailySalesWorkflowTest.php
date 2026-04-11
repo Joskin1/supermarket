@@ -6,26 +6,27 @@ use App\Actions\Sales\CreateSalesImportBatchAction;
 use App\Actions\Sales\ProcessSalesImportAction;
 use App\Enums\RoleEnum;
 use App\Enums\SalesImportBatchStatus;
-use App\Exports\DailySalesTemplateExport;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
-use App\Support\SalesImport\DailySalesTemplateColumns;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Tests\Feature\Sales\Concerns\BuildsDailySalesWorkbook;
 use Tests\TestCase;
 
 class DailySalesWorkflowTest extends TestCase
 {
+    use BuildsDailySalesWorkbook;
     use RefreshDatabase;
 
-    public function test_daily_sales_template_export_has_expected_columns(): void
+    protected function setUp(): void
     {
-        $export = new DailySalesTemplateExport;
+        parent::setUp();
 
-        $this->assertSame(DailySalesTemplateColumns::all(), $export->headings());
+        Storage::fake('local');
     }
 
     public function test_sales_import_batch_is_created_on_upload(): void
@@ -34,11 +35,13 @@ class DailySalesWorkflowTest extends TestCase
 
         $admin = User::factory()->create();
         $admin->assignRole(RoleEnum::ADMIN->value);
+        $product = $this->makeProduct(['sku' => 'SKU-001']);
 
         $batch = app(CreateSalesImportBatchAction::class)->execute([
-            'file' => $this->makeCsvUpload([
-                $this->validRow(['product_code' => 'SKU-001']),
-            ]),
+            'file' => $this->makeSalesWorkbookUpload(
+                [$this->salesEntryRow(['product_code' => $product->sku])],
+                [$this->referenceRowForProduct($product)],
+            ),
             'uploaded_by' => $admin->id,
             'notes' => 'Morning upload.',
         ]);
@@ -48,15 +51,21 @@ class DailySalesWorkflowTest extends TestCase
         $this->assertSame('Morning upload.', $batch->notes);
     }
 
-    public function test_valid_row_creates_sales_record_and_deducts_stock(): void
+    public function test_valid_row_creates_sales_record_deducts_stock_and_persists_sale_time(): void
     {
         $admin = $this->makeAdmin();
         $product = $this->makeProduct(['sku' => 'SKU-001', 'current_stock' => 10]);
 
         $batch = app(CreateSalesImportBatchAction::class)->execute([
-            'file' => $this->makeCsvUpload([
-                $this->validRow(['product_code' => $product->sku, 'quantity_sold' => 4]),
-            ]),
+            'file' => $this->makeSalesWorkbookUpload(
+                [$this->salesEntryRow([
+                    'date' => '2026-04-10',
+                    'time' => '14:25',
+                    'product_code' => $product->sku,
+                    'quantity_sold' => 4,
+                ])],
+                [$this->referenceRowForProduct($product)],
+            ),
             'uploaded_by' => $admin->id,
         ]);
 
@@ -67,7 +76,191 @@ class DailySalesWorkflowTest extends TestCase
         $this->assertSame(1, $processed->successful_rows);
         $this->assertSame(0, $processed->failed_rows);
         $this->assertSame(6, $product->current_stock);
-        $this->assertDatabaseCount('sales_records', 1);
+
+        $this->assertDatabaseHas('sales_records', [
+            'batch_id' => $batch->id,
+            'product_id' => $product->id,
+            'quantity_sold' => 4,
+            'sales_date' => '2026-04-10',
+            'sales_time' => '14:25:00',
+            'source_row_number' => 2,
+        ]);
+    }
+
+    public function test_total_amount_is_derived_from_unit_price_and_quantity_on_import(): void
+    {
+        $admin = $this->makeAdmin();
+        $product = $this->makeProduct(['sku' => 'SKU-001', 'current_stock' => 10]);
+
+        $batch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $this->makeSalesWorkbookUpload(
+                [$this->salesEntryRow([
+                    'product_code' => $product->sku,
+                    'unit_price' => 575,
+                    'quantity_sold' => 3,
+                    'total_amount' => 9999,
+                ])],
+                [$this->referenceRowForProduct($product)],
+            ),
+            'uploaded_by' => $admin->id,
+        ]);
+
+        app(ProcessSalesImportAction::class)->execute($batch);
+
+        $this->assertDatabaseHas('sales_records', [
+            'batch_id' => $batch->id,
+            'product_id' => $product->id,
+            'total_amount' => 1725,
+        ]);
+    }
+
+    public function test_repeated_product_rows_are_processed_as_separate_sales_when_stock_is_sufficient(): void
+    {
+        $admin = $this->makeAdmin();
+        $product = $this->makeProduct(['sku' => 'SKU-001', 'current_stock' => 10]);
+
+        $batch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $this->makeSalesWorkbookUpload(
+                [
+                    $this->salesEntryRow([
+                        'time' => '09:00',
+                        'product_code' => $product->sku,
+                        'quantity_sold' => 3,
+                    ]),
+                    $this->salesEntryRow([
+                        'time' => '09:30',
+                        'product_code' => $product->sku,
+                        'quantity_sold' => 2,
+                    ]),
+                ],
+                [$this->referenceRowForProduct($product)],
+            ),
+            'uploaded_by' => $admin->id,
+        ]);
+
+        $processed = app(ProcessSalesImportAction::class)->execute($batch);
+        $product->refresh();
+
+        $this->assertSame(SalesImportBatchStatus::PROCESSED, $processed->status);
+        $this->assertSame(2, $processed->successful_rows);
+        $this->assertSame(0, $processed->failed_rows);
+        $this->assertSame(5, $product->current_stock);
+        $this->assertSame(5, $processed->total_quantity_sold);
+        $this->assertDatabaseHas('sales_records', [
+            'batch_id' => $batch->id,
+            'source_row_number' => 2,
+            'quantity_sold' => 3,
+        ]);
+        $this->assertDatabaseHas('sales_records', [
+            'batch_id' => $batch->id,
+            'source_row_number' => 3,
+            'quantity_sold' => 2,
+        ]);
+    }
+
+    public function test_running_stock_validation_respects_cumulative_row_order_within_the_batch(): void
+    {
+        $admin = $this->makeAdmin();
+        $product = $this->makeProduct(['sku' => 'SKU-001', 'current_stock' => 4]);
+
+        $batch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $this->makeSalesWorkbookUpload(
+                [
+                    $this->salesEntryRow([
+                        'time' => '09:00',
+                        'product_code' => $product->sku,
+                        'quantity_sold' => 3,
+                    ]),
+                    $this->salesEntryRow([
+                        'time' => '09:30',
+                        'product_code' => $product->sku,
+                        'quantity_sold' => 2,
+                    ]),
+                ],
+                [$this->referenceRowForProduct($product)],
+            ),
+            'uploaded_by' => $admin->id,
+        ]);
+
+        $processed = app(ProcessSalesImportAction::class)->execute($batch);
+        $product->refresh();
+
+        $this->assertSame(SalesImportBatchStatus::PROCESSED_WITH_FAILURES, $processed->status);
+        $this->assertSame(1, $processed->successful_rows);
+        $this->assertSame(1, $processed->failed_rows);
+        $this->assertSame(1, $product->current_stock);
+
+        $this->assertDatabaseHas('sales_import_failures', [
+            'batch_id' => $batch->id,
+            'row_number' => 3,
+            'product_code' => $product->sku,
+        ]);
+    }
+
+    public function test_blank_sales_entry_rows_are_skipped_cleanly(): void
+    {
+        $admin = $this->makeAdmin();
+        $product = $this->makeProduct(['sku' => 'SKU-001', 'current_stock' => 8]);
+
+        $batch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $this->makeSalesWorkbookUpload(
+                [
+                    $this->salesEntryRow([
+                        'product_code' => $product->sku,
+                        'quantity_sold' => 2,
+                    ]),
+                    [
+                        'date' => now()->toDateString(),
+                        'time' => '',
+                        'product_code' => '',
+                        'product_name' => '',
+                        'unit_price' => '',
+                        'quantity_sold' => '',
+                        'total_amount' => '',
+                        'note' => '',
+                    ],
+                ],
+                [$this->referenceRowForProduct($product)],
+            ),
+            'uploaded_by' => $admin->id,
+        ]);
+
+        $processed = app(ProcessSalesImportAction::class)->execute($batch);
+
+        $this->assertSame(SalesImportBatchStatus::PROCESSED, $processed->status);
+        $this->assertSame(1, $processed->total_rows);
+        $this->assertSame(1, $processed->successful_rows);
+        $this->assertSame(0, $processed->failed_rows);
+    }
+
+    public function test_partially_filled_invalid_rows_create_failures(): void
+    {
+        $admin = $this->makeAdmin();
+        $product = $this->makeProduct(['sku' => 'SKU-001', 'current_stock' => 5]);
+
+        $batch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $this->makeSalesWorkbookUpload(
+                [
+                    $this->salesEntryRow([
+                        'product_code' => $product->sku,
+                        'unit_price' => 500,
+                        'quantity_sold' => '',
+                        'total_amount' => '',
+                    ]),
+                ],
+                [$this->referenceRowForProduct($product)],
+            ),
+            'uploaded_by' => $admin->id,
+        ]);
+
+        $processed = app(ProcessSalesImportAction::class)->execute($batch);
+        $product->refresh();
+
+        $this->assertSame(SalesImportBatchStatus::FAILED, $processed->status);
+        $this->assertSame(0, $processed->successful_rows);
+        $this->assertSame(1, $processed->failed_rows);
+        $this->assertSame(5, $product->current_stock);
+        $this->assertDatabaseCount('sales_import_failures', 1);
     }
 
     public function test_unknown_product_code_fails_and_does_not_deduct_stock(): void
@@ -76,8 +269,8 @@ class DailySalesWorkflowTest extends TestCase
         $product = $this->makeProduct(['sku' => 'SKU-001', 'current_stock' => 5]);
 
         $batch = app(CreateSalesImportBatchAction::class)->execute([
-            'file' => $this->makeCsvUpload([
-                $this->validRow(['product_code' => 'UNKNOWN-001']),
+            'file' => $this->makeSalesWorkbookUpload([
+                $this->salesEntryRow(['product_code' => 'UNKNOWN-001']),
             ]),
             'uploaded_by' => $admin->id,
         ]);
@@ -93,84 +286,18 @@ class DailySalesWorkflowTest extends TestCase
         $this->assertDatabaseCount('sales_import_failures', 1);
     }
 
-    public function test_invalid_quantity_fails_and_does_not_deduct_stock(): void
-    {
-        $admin = $this->makeAdmin();
-        $product = $this->makeProduct(['sku' => 'SKU-001', 'current_stock' => 5]);
-
-        $batch = app(CreateSalesImportBatchAction::class)->execute([
-            'file' => $this->makeCsvUpload([
-                $this->validRow(['product_code' => $product->sku, 'quantity_sold' => 0]),
-            ]),
-            'uploaded_by' => $admin->id,
-        ]);
-
-        $processed = app(ProcessSalesImportAction::class)->execute($batch);
-        $product->refresh();
-
-        $this->assertSame(SalesImportBatchStatus::FAILED, $processed->status);
-        $this->assertSame(5, $product->current_stock);
-        $this->assertDatabaseCount('sales_records', 0);
-        $this->assertDatabaseCount('sales_import_failures', 1);
-    }
-
-    public function test_insufficient_stock_fails_and_does_not_deduct_stock(): void
-    {
-        $admin = $this->makeAdmin();
-        $product = $this->makeProduct(['sku' => 'SKU-001', 'current_stock' => 2]);
-
-        $batch = app(CreateSalesImportBatchAction::class)->execute([
-            'file' => $this->makeCsvUpload([
-                $this->validRow(['product_code' => $product->sku, 'quantity_sold' => 5]),
-            ]),
-            'uploaded_by' => $admin->id,
-        ]);
-
-        $processed = app(ProcessSalesImportAction::class)->execute($batch);
-        $product->refresh();
-
-        $this->assertSame(SalesImportBatchStatus::FAILED, $processed->status);
-        $this->assertSame(2, $product->current_stock);
-        $this->assertDatabaseCount('sales_records', 0);
-        $this->assertDatabaseCount('sales_import_failures', 1);
-    }
-
-    public function test_mixed_valid_and_invalid_rows_are_processed_with_failures(): void
-    {
-        $admin = $this->makeAdmin();
-        $product = $this->makeProduct(['sku' => 'SKU-001', 'current_stock' => 8]);
-
-        $batch = app(CreateSalesImportBatchAction::class)->execute([
-            'file' => $this->makeCsvUpload([
-                $this->validRow(['product_code' => $product->sku, 'quantity_sold' => 2]),
-                $this->validRow(['product_code' => 'UNKNOWN-001']),
-            ]),
-            'uploaded_by' => $admin->id,
-        ]);
-
-        $processed = app(ProcessSalesImportAction::class)->execute($batch);
-        $product->refresh();
-
-        $this->assertSame(SalesImportBatchStatus::PROCESSED_WITH_FAILURES, $processed->status);
-        $this->assertSame(2, $processed->total_rows);
-        $this->assertSame(1, $processed->successful_rows);
-        $this->assertSame(1, $processed->failed_rows);
-        $this->assertSame(6, $product->current_stock);
-        $this->assertDatabaseCount('sales_records', 1);
-        $this->assertDatabaseCount('sales_import_failures', 1);
-    }
-
     public function test_duplicate_file_detection_blocks_reimport(): void
     {
         $admin = $this->makeAdmin();
         $product = $this->makeProduct(['sku' => 'SKU-001', 'current_stock' => 10]);
 
-        $file = $this->makeCsvUpload([
-            $this->validRow(['product_code' => $product->sku, 'quantity_sold' => 1]),
-        ]);
+        $binary = $this->buildSalesWorkbookBinary(
+            [$this->salesEntryRow(['product_code' => $product->sku])],
+            [$this->referenceRowForProduct($product)],
+        );
 
         $firstBatch = app(CreateSalesImportBatchAction::class)->execute([
-            'file' => $file,
+            'file' => UploadedFile::fake()->createWithContent('daily-sales.xlsx', $binary),
             'uploaded_by' => $admin->id,
         ]);
 
@@ -179,7 +306,7 @@ class DailySalesWorkflowTest extends TestCase
         $this->expectException(ValidationException::class);
 
         app(CreateSalesImportBatchAction::class)->execute([
-            'file' => $file,
+            'file' => UploadedFile::fake()->createWithContent('daily-sales.xlsx', $binary),
             'uploaded_by' => $admin->id,
         ]);
     }
@@ -190,10 +317,13 @@ class DailySalesWorkflowTest extends TestCase
         $product = $this->makeProduct(['sku' => 'SKU-001', 'current_stock' => 10]);
 
         $batch = app(CreateSalesImportBatchAction::class)->execute([
-            'file' => $this->makeCsvUpload([
-                $this->validRow(['product_code' => $product->sku, 'quantity_sold' => 2, 'unit_price' => 500]),
-                $this->validRow(['product_code' => $product->sku, 'quantity_sold' => 1, 'unit_price' => 500]),
-            ]),
+            'file' => $this->makeSalesWorkbookUpload(
+                [
+                    $this->salesEntryRow(['product_code' => $product->sku, 'quantity_sold' => 2, 'unit_price' => 500]),
+                    $this->salesEntryRow(['product_code' => $product->sku, 'quantity_sold' => 1, 'unit_price' => 500]),
+                ],
+                [$this->referenceRowForProduct($product)],
+            ),
             'uploaded_by' => $admin->id,
         ]);
 
@@ -217,7 +347,8 @@ class DailySalesWorkflowTest extends TestCase
             ->assertOk();
 
         $this->get('/admin/daily-sales-export')
-            ->assertOk();
+            ->assertOk()
+            ->assertSeeText('Sales Entry Log');
     }
 
     public function test_sales_import_batches_are_accessible_to_sudo_users(): void
@@ -277,52 +408,5 @@ class DailySalesWorkflowTest extends TestCase
             'unit_of_measure' => 'bottle',
             'is_active' => true,
         ], $overrides));
-    }
-
-    /**
-     * @param  array<int, array<string, mixed>>  $rows
-     */
-    private function makeCsvUpload(array $rows): UploadedFile
-    {
-        $content = implode("\n", array_map(function (array $row): string {
-            return implode(',', array_map(function (mixed $value): string {
-                $value = (string) $value;
-
-                if (str_contains($value, ',') || str_contains($value, '"')) {
-                    $value = '"'.str_replace('"', '""', $value).'"';
-                }
-
-                return $value;
-            }, $row));
-        }, array_merge([DailySalesTemplateColumns::all()], $rows)));
-
-        return UploadedFile::fake()->createWithContent('daily-sales.csv', $content);
-    }
-
-    /**
-     * @param  array<string, mixed>  $overrides
-     * @return array<string, mixed>
-     */
-    private function validRow(array $overrides = []): array
-    {
-        $row = array_merge([
-            'date' => now()->toDateString(),
-            'product_code' => 'SKU-001',
-            'category' => 'Beverages',
-            'product_name' => 'Coca-Cola Classic Soft Drink',
-            'unit_price' => 500,
-            'quantity_sold' => 1,
-            'total_amount' => 500,
-            'note' => '',
-        ], $overrides);
-
-        if (
-            (array_key_exists('unit_price', $overrides) || array_key_exists('quantity_sold', $overrides))
-            && ! array_key_exists('total_amount', $overrides)
-        ) {
-            $row['total_amount'] = (float) $row['unit_price'] * (int) $row['quantity_sold'];
-        }
-
-        return $row;
     }
 }

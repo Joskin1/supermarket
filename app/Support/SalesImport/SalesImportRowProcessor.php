@@ -23,6 +23,7 @@ class SalesImportRowProcessor
     {
         try {
             $validated = $this->validator->validate($row);
+            $validated['source_row_number'] = $rowNumber;
 
             $this->applySalesRecordToInventoryAction->execute($batch, $validated);
         } catch (ValidationException $exception) {

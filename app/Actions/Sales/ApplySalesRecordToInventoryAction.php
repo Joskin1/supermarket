@@ -29,7 +29,7 @@ class ApplySalesRecordToInventoryAction
 
             if ($lockedProduct->current_stock < $data['quantity_sold']) {
                 throw ValidationException::withMessages([
-                    'quantity_sold' => 'The quantity sold exceeds the current stock for this product.',
+                    'quantity_sold' => 'The quantity sold exceeds the remaining stock for this product at this row. Available stock: '.$lockedProduct->current_stock.'.',
                 ]);
             }
 
@@ -42,6 +42,8 @@ class ApplySalesRecordToInventoryAction
                 'quantity_sold' => $data['quantity_sold'],
                 'total_amount' => $data['total_amount'],
                 'sales_date' => $data['sales_date'],
+                'sales_time' => $data['sales_time'] ?? null,
+                'source_row_number' => $data['source_row_number'] ?? null,
                 'note' => $data['note'] ?? null,
                 'created_by' => $batch->uploaded_by,
             ]);

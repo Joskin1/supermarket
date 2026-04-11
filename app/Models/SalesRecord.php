@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'quantity_sold',
     'total_amount',
     'sales_date',
+    'sales_time',
+    'source_row_number',
     'note',
     'created_by',
 ])]
@@ -34,6 +36,7 @@ class SalesRecord extends Model
             'quantity_sold' => 'integer',
             'total_amount' => 'decimal:2',
             'sales_date' => DateOnlyCast::class,
+            'source_row_number' => 'integer',
         ];
     }
 

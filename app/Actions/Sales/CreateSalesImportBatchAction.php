@@ -29,8 +29,8 @@ class CreateSalesImportBatchAction
                 return;
             }
 
-            if (! in_array(strtolower($file->getClientOriginalExtension()), ['xlsx', 'csv'], true)) {
-                $validator->errors()->add('file', 'The sales file must be an .xlsx or .csv file.');
+            if (strtolower($file->getClientOriginalExtension()) !== 'xlsx') {
+                $validator->errors()->add('file', 'The sales file must be an .xlsx workbook.');
             }
         })->validate();
 

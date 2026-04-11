@@ -33,6 +33,8 @@ class SalesRecordFactory extends Factory
             'quantity_sold' => $quantity,
             'total_amount' => round($unitPrice * $quantity, 2),
             'sales_date' => now()->toDateString(),
+            'sales_time' => fake()->time('H:i:s'),
+            'source_row_number' => fake()->numberBetween(2, 2000),
             'note' => null,
             'created_by' => User::factory(),
         ];

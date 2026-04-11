@@ -5,8 +5,8 @@ namespace App\Filament\Resources\SalesRecords\Tables;
 use App\Models\SalesRecord;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\Summarizers\Sum;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -23,6 +23,11 @@ class SalesRecordsTable
                 TextColumn::make('sales_date')
                     ->date()
                     ->sortable(),
+                TextColumn::make('sales_time')
+                    ->label('Sales time')
+                    ->placeholder('Not provided')
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('product_code_snapshot')
                     ->label('Product code')
                     ->searchable()
@@ -61,6 +66,11 @@ class SalesRecordsTable
                     ->label('Batch')
                     ->searchable()
                     ->copyable()
+                    ->toggleable(),
+                TextColumn::make('source_row_number')
+                    ->label('Sheet row')
+                    ->numeric()
+                    ->sortable()
                     ->toggleable(),
                 TextColumn::make('creator.name')
                     ->label('Imported by')

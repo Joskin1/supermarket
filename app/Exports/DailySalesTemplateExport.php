@@ -2,45 +2,24 @@
 
 namespace App\Exports;
 
-use App\Models\Product;
-use App\Support\SalesImport\DailySalesTemplateColumns;
-use Carbon\CarbonImmutable;
-use Illuminate\Support\Collection;
-use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
-use Maatwebsite\Excel\Concerns\WithHeadings;
+use App\Exports\DailySalesTemplate\ProductReferenceSheetExport;
+use App\Exports\DailySalesTemplate\SalesEntryLogSheetExport;
+use Carbon\CarbonInterface;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
-class DailySalesTemplateExport implements FromCollection, ShouldAutoSize, WithHeadings
+class DailySalesTemplateExport implements WithMultipleSheets
 {
     public function __construct(
-        protected ?CarbonImmutable $salesDate = null,
+        protected ?CarbonInterface $salesDate = null,
     ) {}
 
-    public function collection(): Collection
+    public function sheets(): array
     {
-        $salesDate = ($this->salesDate ?? now())->toDateString();
+        $salesDate = $this->salesDate ?? now();
 
-        return Product::query()
-            ->with('category:id,name')
-            ->active()
-            ->orderBy('name')
-            ->get()
-            ->map(function (Product $product) use ($salesDate): array {
-                return [
-                    'date' => $salesDate,
-                    'product_code' => $product->sku,
-                    'category' => $product->category?->name,
-                    'product_name' => $product->name,
-                    'unit_price' => $product->selling_price,
-                    'quantity_sold' => null,
-                    'total_amount' => null,
-                    'note' => null,
-                ];
-            });
-    }
-
-    public function headings(): array
-    {
-        return DailySalesTemplateColumns::all();
+        return [
+            new ProductReferenceSheetExport,
+            new SalesEntryLogSheetExport($salesDate),
+        ];
     }
 }
