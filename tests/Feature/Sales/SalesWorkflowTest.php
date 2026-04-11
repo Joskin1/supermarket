@@ -92,7 +92,7 @@ class SalesWorkflowTest extends TestCase
         $this->assertSame($activeProduct->name, $rows[0][2]);
     }
 
-    public function test_sales_entry_sheet_uses_the_new_columns_and_derived_formulas(): void
+    public function test_sales_entry_sheet_keeps_the_time_column_manual_and_uses_the_expected_formulas(): void
     {
         Product::factory()->create([
             'sku' => 'SKU-ACTIVE-1001',
@@ -110,9 +110,12 @@ class SalesWorkflowTest extends TestCase
         $sheet = $spreadsheet->getSheetByName(DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET);
 
         $this->assertSame('2026-04-10', $sheet?->getCell('A2')->getFormattedValue());
+        $this->assertSame('time', $sheet?->getCell('B1')->getValue());
+        $this->assertNull($sheet?->getCell('B2')->getValue());
         $this->assertStringStartsWith('=IF($C2=', (string) $sheet?->getCell('D2')->getValue());
         $this->assertStringStartsWith('=IF($C2=', (string) $sheet?->getCell('E2')->getValue());
         $this->assertStringStartsWith('=IF(OR($E2=', (string) $sheet?->getCell('G2')->getValue());
+        $this->assertStringContainsString('Ctrl+Shift+:', (string) $sheet?->getCell('J2')->getValue());
     }
 
     public function test_sales_import_batch_is_created_and_processed_from_an_uploaded_workbook(): void

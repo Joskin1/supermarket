@@ -12,6 +12,8 @@ use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithTitle;
 use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Cell\DataValidation;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -74,6 +76,7 @@ class SalesEntryLogSheetExport implements FromArray, ShouldAutoSize, WithEvents,
 
                 $sheet->freezePane('A2');
                 $sheet->setAutoFilter("A1:H{$highestRow}");
+                $sheet->getColumnDimension('B')->setWidth(18);
                 $sheet->getStyle("A2:A{$highestRow}")
                     ->getNumberFormat()
                     ->setFormatCode(NumberFormat::FORMAT_DATE_YYYYMMDD2);
@@ -97,6 +100,9 @@ class SalesEntryLogSheetExport implements FromArray, ShouldAutoSize, WithEvents,
                     ->setRGB('ECFDF5');
 
                 $this->applyDateValidation($sheet, $highestRow);
+                $this->applyTimeValidation($sheet, $highestRow);
+                $this->applyTimeColumnComment($sheet);
+                $this->applyWorksheetGuidance($sheet);
             },
         ];
     }
@@ -144,5 +150,74 @@ class SalesEntryLogSheetExport implements FromArray, ShouldAutoSize, WithEvents,
             $validation->setErrorTitle('Invalid date');
             $validation->setError('Enter a valid sale date.');
         }
+    }
+
+    protected function applyTimeValidation(Worksheet $sheet, int $highestRow): void
+    {
+        for ($rowNumber = 2; $rowNumber <= $highestRow; $rowNumber++) {
+            $validation = $sheet->getCell("B{$rowNumber}")->getDataValidation();
+            $validation->setType(DataValidation::TYPE_TIME);
+            $validation->setOperator(DataValidation::OPERATOR_BETWEEN);
+            $validation->setAllowBlank(true);
+            $validation->setShowInputMessage(true);
+            $validation->setShowErrorMessage(true);
+            $validation->setPromptTitle('Enter sale time');
+            $validation->setPrompt('Enter the sale time manually as a fixed value in hh:mm format.');
+            $validation->setErrorTitle('Invalid time');
+            $validation->setError('Enter a valid fixed sale time in hh:mm format.');
+            $validation->setFormula1('TIME(0,0,0)');
+            $validation->setFormula2('TIME(23,59,59)');
+        }
+    }
+
+    protected function applyTimeColumnComment(Worksheet $sheet): void
+    {
+        $comment = $sheet->getComment('B1');
+        $comment->setAuthor((string) config('app.name', 'Supermarket'));
+        $comment->getText()->createTextRun('Enter the sale time manually as a fixed hh:mm value.');
+    }
+
+    protected function applyWorksheetGuidance(Worksheet $sheet): void
+    {
+        $sheet->mergeCells('J1:L1');
+        $sheet->mergeCells('J2:L4');
+        $sheet->setCellValue('J1', 'Quick guide');
+        $sheet->setCellValue(
+            'J2',
+            "Enter one sale per row.\nFor time, press Ctrl+Shift+: in Excel to insert the current time as a fixed value.",
+        );
+
+        foreach (['J', 'K', 'L'] as $column) {
+            $sheet->getColumnDimension($column)->setWidth(18);
+        }
+
+        $sheet->getStyle('J1:L4')->applyFromArray([
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'FEF3C7'],
+            ],
+            'borders' => [
+                'outline' => [
+                    'borderStyle' => Border::BORDER_THIN,
+                    'color' => ['rgb' => 'F59E0B'],
+                ],
+            ],
+        ]);
+
+        $sheet->getStyle('J1:L1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_LEFT,
+            ],
+        ]);
+
+        $sheet->getStyle('J2:L4')->applyFromArray([
+            'alignment' => [
+                'wrapText' => true,
+                'vertical' => Alignment::VERTICAL_TOP,
+            ],
+        ]);
     }
 }

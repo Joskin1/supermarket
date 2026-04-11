@@ -24,7 +24,10 @@ class SalesAdminPagesTest extends TestCase
 
         $this->actingAs($admin);
 
-        $this->get('/admin/daily-sales-export')->assertOk();
+        $this->get('/admin/daily-sales-export')
+            ->assertOk()
+            ->assertSeeText('Ctrl+Shift+:')
+            ->assertSeeText('fixed value');
         $this->get('/admin/sales-import-batches')->assertOk();
         $this->get('/admin/sales-records')->assertOk();
     }

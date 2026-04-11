@@ -5,7 +5,7 @@
             <p class="mt-2 text-sm text-gray-600">
                 Download the workbook, use the <strong>{{ $this->getProductReferenceSheetName() }}</strong> sheet for product codes and prices,
                 then record every transaction on a new row inside <strong>{{ $this->getSalesEntryLogSheetName() }}</strong>.
-                The system validates each sale row, imports valid rows, deducts stock in row order, and flags invalid rows clearly inside the batch.
+                Enter the time column manually as a fixed value. The system validates each sale row, imports valid rows, deducts stock in row order, and flags invalid rows clearly inside the batch.
             </p>
 
             <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -25,14 +25,18 @@
                 </div>
 
                 <div class="rounded-xl bg-violet-50 p-4">
-                    <p class="text-sm font-semibold text-violet-900">4. Review</p>
-                    <p class="mt-1 text-sm text-violet-800">Product code is the key, unit price stays editable, and total amount is derived from price multiplied by quantity.</p>
+                    <p class="text-sm font-semibold text-violet-900">4. Time Entry</p>
+                    <p class="mt-1 text-sm text-violet-800">In Excel, click the time cell and press <strong>Ctrl+Shift+:</strong> to insert the current time as a fixed value.</p>
                 </div>
 
                 <div class="rounded-xl bg-rose-50 p-4">
                     <p class="text-sm font-semibold text-rose-900">5. Upload</p>
                     <p class="mt-1 text-sm text-rose-800">Upload the completed workbook to create one tracked batch with imported sales rows and any failures.</p>
                 </div>
+            </div>
+
+            <div class="mt-4 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900">
+                Time is entered manually on purpose so it stays fixed after save and reopen.
             </div>
         </section>
 
@@ -64,7 +68,7 @@
                         <span class="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-sky-700">One sale per row</span>
                     </div>
 
-                    <p class="mt-2 text-sm text-sky-900">Enter each transaction on its own row. Repeated sales of the same product should appear on separate rows, in the order they happened.</p>
+                    <p class="mt-2 text-sm text-sky-900">Enter each transaction on its own row. Repeated sales of the same product should appear on separate rows, in the order they happened. For time, enter a fixed value manually and use <strong>Ctrl+Shift+:</strong> in Excel when you want the current time.</p>
 
                     <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         @foreach ($this->getExpectedColumns() as $column)
