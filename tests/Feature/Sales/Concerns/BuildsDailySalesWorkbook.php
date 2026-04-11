@@ -83,6 +83,20 @@ trait BuildsDailySalesWorkbook
         return $spreadsheet;
     }
 
+    protected function saveSpreadsheetToBinary(Spreadsheet $spreadsheet): string
+    {
+        $writer = new Xlsx($spreadsheet);
+
+        ob_start();
+        $writer->save('php://output');
+        $binary = ob_get_clean();
+
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet);
+
+        return is_string($binary) ? $binary : '';
+    }
+
     protected function referenceRowForProduct(Product $product): array
     {
         return [

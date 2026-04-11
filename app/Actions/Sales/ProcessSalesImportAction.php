@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
 use Throwable;
 
 class ProcessSalesImportAction
@@ -63,19 +64,30 @@ class ProcessSalesImportAction
     {
         $path = Storage::disk('local')->path($batch->file_path);
         $reader = IOFactory::createReaderForFile($path);
-        $reader->setReadDataOnly(true);
-        $spreadsheet = $reader->load($path);
+        $worksheetNames = $reader->listWorksheetNames($path);
 
         foreach ([
             DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET,
             DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET,
         ] as $sheetName) {
-            if ($spreadsheet->getSheetByName($sheetName) === null) {
+            if (! in_array($sheetName, $worksheetNames, true)) {
                 throw ValidationException::withMessages([
                     'file' => 'The uploaded workbook must include both the "Product Reference" and "Sales Entry Log" sheets.',
                 ]);
             }
         }
+
+        $reader->setReadDataOnly(true);
+        $reader->setLoadSheetsOnly([DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET]);
+        $reader->setReadFilter(new class implements IReadFilter
+        {
+            public function readCell($columnAddress, $row, $worksheetName = ''): bool
+            {
+                return $row === 1 && in_array($columnAddress, range('A', 'H'), true);
+            }
+        });
+
+        $spreadsheet = $reader->load($path);
 
         $headings = $spreadsheet
             ->getSheetByName(DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET)

@@ -12,6 +12,7 @@ use App\Support\SalesImport\DailySalesTemplateColumns;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
@@ -164,6 +165,154 @@ class SalesWorkflowTest extends TestCase
             'quantity_sold' => 3,
             'sales_date' => '2026-04-10',
             'sales_time' => '18:05:00',
+        ]);
+    }
+
+    public function test_exported_template_workbook_can_be_uploaded_and_processed(): void
+    {
+        $uploader = User::factory()->create();
+        $product = Product::factory()->create([
+            'sku' => 'SKU-TEMPLATE-1001',
+            'selling_price' => 2400,
+            'current_stock' => 9,
+            'is_active' => true,
+        ]);
+
+        $binary = Excel::raw(
+            new DailySalesTemplateExport(CarbonImmutable::parse('2026-04-10')),
+            \Maatwebsite\Excel\Excel::XLSX,
+        );
+
+        $spreadsheet = $this->loadSpreadsheetFromBinary($binary);
+        $sheet = $spreadsheet->getSheetByName(DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET);
+        $sheet?->setCellValue('B2', '10:45');
+        $sheet?->setCellValue('C2', $product->sku);
+        $sheet?->setCellValue('F2', 2);
+
+        $upload = UploadedFile::fake()->createWithContent(
+            'daily-sales-template.xlsx',
+            $this->saveSpreadsheetToBinary($spreadsheet),
+        );
+
+        $batch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $upload,
+            'uploaded_by' => $uploader->id,
+        ]);
+
+        $processedBatch = app(ProcessSalesImportAction::class)->execute($batch);
+
+        $this->assertSame(SalesImportBatchStatus::PROCESSED, $processedBatch->status);
+        $this->assertSame(1, $processedBatch->successful_rows);
+        $this->assertSame(0, $processedBatch->failed_rows);
+        $this->assertSame(7, $product->fresh()->current_stock);
+        $this->assertDatabaseHas('sales_records', [
+            'batch_id' => $batch->id,
+            'product_id' => $product->id,
+            'quantity_sold' => 2,
+            'unit_price' => 2400,
+            'total_amount' => 4800,
+            'sales_time' => '10:45:00',
+        ]);
+    }
+
+    public function test_exported_template_skips_untouched_rows_even_when_excel_caches_formula_values(): void
+    {
+        $uploader = User::factory()->create();
+        $product = Product::factory()->create([
+            'sku' => 'SKU-CACHED-1001',
+            'selling_price' => 2400,
+            'current_stock' => 9,
+            'is_active' => true,
+        ]);
+
+        $binary = Excel::raw(
+            new DailySalesTemplateExport(CarbonImmutable::parse('2026-04-10')),
+            \Maatwebsite\Excel\Excel::XLSX,
+        );
+
+        $spreadsheet = $this->loadSpreadsheetFromBinary($binary);
+        $sheet = $spreadsheet->getSheetByName(DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET);
+        $sheet?->setCellValue('B2', '10:45');
+        $sheet?->setCellValue('C2', $product->sku);
+        $sheet?->setCellValue('F2', 2);
+
+        foreach (['D3', 'E3', 'G3'] as $coordinate) {
+            $sheet?->getCell($coordinate)->setCalculatedValue(0);
+        }
+
+        $upload = UploadedFile::fake()->createWithContent(
+            'daily-sales-template.xlsx',
+            $this->saveSpreadsheetToBinary($spreadsheet),
+        );
+
+        $batch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $upload,
+            'uploaded_by' => $uploader->id,
+        ]);
+
+        $processedBatch = app(ProcessSalesImportAction::class)->execute($batch);
+
+        $this->assertSame(SalesImportBatchStatus::PROCESSED, $processedBatch->status);
+        $this->assertSame(1, $processedBatch->successful_rows);
+        $this->assertSame(0, $processedBatch->failed_rows);
+    }
+
+    public function test_import_still_processes_when_runtime_schema_is_missing_new_sales_columns(): void
+    {
+        $uploader = User::factory()->create();
+        $product = Product::factory()->create([
+            'sku' => 'SKU-COMPAT-1001',
+            'selling_price' => 1800,
+            'current_stock' => 12,
+        ]);
+
+        Schema::shouldReceive('getColumnListing')
+            ->once()
+            ->andReturn([
+                'id',
+                'batch_id',
+                'product_id',
+                'product_code_snapshot',
+                'category_snapshot',
+                'product_name_snapshot',
+                'unit_price',
+                'quantity_sold',
+                'total_amount',
+                'sales_date',
+                'note',
+                'created_by',
+                'created_at',
+                'updated_at',
+            ]);
+
+        $batch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $this->makeSalesWorkbookUpload(
+                [
+                    $this->salesEntryRow([
+                        'date' => '2026-04-10',
+                        'time' => '18:05',
+                        'product_code' => $product->sku,
+                        'product_name' => $product->name,
+                        'unit_price' => 1800,
+                        'quantity_sold' => 3,
+                        'total_amount' => 5400,
+                    ]),
+                ],
+                [$this->referenceRowForProduct($product)],
+            ),
+            'uploaded_by' => $uploader->id,
+        ]);
+
+        $processedBatch = app(ProcessSalesImportAction::class)->execute($batch);
+
+        $this->assertSame(SalesImportBatchStatus::PROCESSED, $processedBatch->status);
+        $this->assertSame(1, $processedBatch->successful_rows);
+        $this->assertSame(0, $processedBatch->failed_rows);
+        $this->assertDatabaseHas('sales_records', [
+            'batch_id' => $batch->id,
+            'product_id' => $product->id,
+            'quantity_sold' => 3,
+            'sales_date' => '2026-04-10',
         ]);
     }
 

@@ -6,10 +6,16 @@ use App\Models\Product;
 use App\Models\SalesImportBatch;
 use App\Models\SalesRecord;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class ApplySalesRecordToInventoryAction
 {
+    /**
+     * @var array<string, true>|null
+     */
+    protected ?array $salesRecordColumns = null;
+
     /**
      * @param  array<string, mixed>  $data
      *
@@ -33,20 +39,9 @@ class ApplySalesRecordToInventoryAction
                 ]);
             }
 
-            $salesRecord = $batch->salesRecords()->create([
-                'product_id' => $lockedProduct->id,
-                'product_code_snapshot' => $lockedProduct->sku,
-                'category_snapshot' => $lockedProduct->category?->name,
-                'product_name_snapshot' => $lockedProduct->name,
-                'unit_price' => $data['unit_price'],
-                'quantity_sold' => $data['quantity_sold'],
-                'total_amount' => $data['total_amount'],
-                'sales_date' => $data['sales_date'],
-                'sales_time' => $data['sales_time'] ?? null,
-                'source_row_number' => $data['source_row_number'] ?? null,
-                'note' => $data['note'] ?? null,
-                'created_by' => $batch->uploaded_by,
-            ]);
+            $salesRecord = $batch->salesRecords()->create(
+                $this->buildSalesRecordAttributes($batch, $lockedProduct, $data),
+            );
 
             $this->afterSalesRecordCreated($salesRecord, $lockedProduct, $data);
 
@@ -61,4 +56,49 @@ class ApplySalesRecordToInventoryAction
      * @param  array<string, mixed>  $data
      */
     protected function afterSalesRecordCreated(SalesRecord $salesRecord, Product $product, array $data): void {}
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function buildSalesRecordAttributes(
+        SalesImportBatch $batch,
+        Product $lockedProduct,
+        array $data,
+    ): array {
+        $attributes = [
+            'product_id' => $lockedProduct->id,
+            'product_code_snapshot' => $lockedProduct->sku,
+            'category_snapshot' => $lockedProduct->category?->name,
+            'product_name_snapshot' => $lockedProduct->name,
+            'unit_price' => $data['unit_price'],
+            'quantity_sold' => $data['quantity_sold'],
+            'total_amount' => $data['total_amount'],
+            'sales_date' => $data['sales_date'],
+            'note' => $data['note'] ?? null,
+            'created_by' => $batch->uploaded_by,
+        ];
+
+        if ($this->salesRecordTableHasColumn('sales_time')) {
+            $attributes['sales_time'] = $data['sales_time'] ?? null;
+        }
+
+        if ($this->salesRecordTableHasColumn('source_row_number')) {
+            $attributes['source_row_number'] = $data['source_row_number'] ?? null;
+        }
+
+        return $attributes;
+    }
+
+    protected function salesRecordTableHasColumn(string $column): bool
+    {
+        if ($this->salesRecordColumns === null) {
+            $this->salesRecordColumns = array_fill_keys(
+                Schema::getColumnListing((new SalesRecord)->getTable()),
+                true,
+            );
+        }
+
+        return isset($this->salesRecordColumns[$column]);
+    }
 }
