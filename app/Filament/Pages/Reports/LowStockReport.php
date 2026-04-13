@@ -102,6 +102,12 @@ class LowStockReport extends BaseReportPage
         return filled(trim($this->search)) ? trim($this->search) : null;
     }
 
+    public function clearFilters(): void
+    {
+        $this->categoryId = '';
+        $this->search = '';
+    }
+
     protected function buildExportFilename(string $extension): string
     {
         return sprintf(

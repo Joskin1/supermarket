@@ -39,6 +39,30 @@ class WeeklySummary extends BaseReportPage
         $this->weekDate = $this->weekDate ?: $today;
     }
 
+    public function showCurrentWeek(): void
+    {
+        $today = now()->toDateString();
+
+        $this->weekDate = $today;
+        $this->fromDate = '';
+        $this->toDate = '';
+    }
+
+    public function showLastWeek(): void
+    {
+        $lastWeek = now()->subWeek();
+
+        $this->weekDate = $lastWeek->toDateString();
+        $this->fromDate = '';
+        $this->toDate = '';
+    }
+
+    public function clearCustomRange(): void
+    {
+        $this->fromDate = '';
+        $this->toDate = '';
+    }
+
     #[Computed]
     public function reportRange(): array
     {

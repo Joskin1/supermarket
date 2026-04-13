@@ -149,6 +149,19 @@ class ReportingServiceTest extends TestCase
         $this->assertSame([2700.0, 1400.0], $distribution['values']);
     }
 
+    public function test_daily_trends_fill_missing_dates_with_zero_values(): void
+    {
+        $this->seedSummarySourceData();
+
+        $trend = app(SalesTrendService::class)->dailyAmountTrend(
+            CarbonImmutable::parse('2026-04-07'),
+            CarbonImmutable::parse('2026-04-09'),
+        );
+
+        $this->assertSame(['07 Apr', '08 Apr', '09 Apr'], $trend['labels']);
+        $this->assertSame([5500.0, 0.0, 2500.0], $trend['values']);
+    }
+
     /**
      * @return array{0: Product, 1: Product}
      */

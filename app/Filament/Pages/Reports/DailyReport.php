@@ -37,6 +37,26 @@ class DailyReport extends BaseReportPage
         $this->toDate = $this->toDate ?: $today;
     }
 
+    public function showToday(): void
+    {
+        $today = now()->toDateString();
+
+        $this->fromDate = $today;
+        $this->toDate = $today;
+    }
+
+    public function showLastSevenDays(): void
+    {
+        $this->fromDate = now()->subDays(6)->toDateString();
+        $this->toDate = now()->toDateString();
+    }
+
+    public function showMonthToDate(): void
+    {
+        $this->fromDate = now()->startOfMonth()->toDateString();
+        $this->toDate = now()->toDateString();
+    }
+
     #[Computed]
     public function reportData(): array
     {

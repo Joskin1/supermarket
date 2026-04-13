@@ -6,9 +6,9 @@ use App\Services\SalesTrendService;
 
 class SalesAmountTrendChart extends BaseReportingChart
 {
-    protected ?string $heading = 'Sales Amount Trend';
+    protected ?string $heading = 'Revenue by Day';
 
-    protected ?string $description = 'Daily sales value across the selected period.';
+    protected ?string $description = 'Use this to spot strong and weak sales days quickly.';
 
     protected function getType(): string
     {

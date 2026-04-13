@@ -2,18 +2,21 @@
 
 namespace App\Filament\Widgets\Reports;
 
+use App\Policies\Concerns\AuthorizesReportingAccess;
 use Carbon\CarbonImmutable;
 use Filament\Widgets\ChartWidget;
 
 abstract class BaseReportingChart extends ChartWidget
 {
+    use AuthorizesReportingAccess;
+
     public string $fromDate = '';
 
     public string $toDate = '';
 
     public static function canView(): bool
     {
-        return auth()->user()?->isAdmin() ?? false;
+        return static::canAccessReports(auth()->user());
     }
 
     /**

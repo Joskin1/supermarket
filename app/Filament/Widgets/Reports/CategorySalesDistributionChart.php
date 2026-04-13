@@ -6,9 +6,9 @@ use App\Services\SalesTrendService;
 
 class CategorySalesDistributionChart extends BaseReportingChart
 {
-    protected ?string $heading = 'Category Revenue Mix';
+    protected ?string $heading = 'Revenue Mix by Category';
 
-    protected ?string $description = 'Which categories are contributing the most revenue.';
+    protected ?string $description = 'Helps you see which departments are carrying the period.';
 
     protected function getType(): string
     {

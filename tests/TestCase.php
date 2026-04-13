@@ -29,6 +29,10 @@ abstract class TestCase extends BaseTestCase
 
     protected function confirmedTwoFactorAttributes(): array
     {
+        if (! Features::enabled(Features::twoFactorAuthentication())) {
+            return [];
+        }
+
         return [
             'two_factor_secret' => encrypt('test-secret'),
             'two_factor_recovery_codes' => encrypt(json_encode(['code-1', 'code-2'])),

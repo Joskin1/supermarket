@@ -6,9 +6,9 @@ use App\Services\SalesTrendService;
 
 class TopProductsChart extends BaseReportingChart
 {
-    protected ?string $heading = 'Top Products by Revenue';
+    protected ?string $heading = 'Top 5 Products by Revenue';
 
-    protected ?string $description = 'The products currently driving the most sales value.';
+    protected ?string $description = 'Use this to see the small group of items driving most value right now.';
 
     protected function getType(): string
     {

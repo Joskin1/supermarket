@@ -6,9 +6,9 @@ use App\Services\SalesTrendService;
 
 class SalesQuantityTrendChart extends BaseReportingChart
 {
-    protected ?string $heading = 'Quantity Sold Trend';
+    protected ?string $heading = 'Units Sold per Day';
 
-    protected ?string $description = 'Daily unit movement across the selected period.';
+    protected ?string $description = 'Shows how much product moved each day in the selected range.';
 
     protected function getType(): string
     {

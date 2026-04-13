@@ -37,6 +37,24 @@ class SalesTrends extends BaseReportPage
         $this->fromDate = $this->fromDate ?: now()->subDays(29)->toDateString();
     }
 
+    public function showLastSevenDays(): void
+    {
+        $this->fromDate = now()->subDays(6)->toDateString();
+        $this->toDate = now()->toDateString();
+    }
+
+    public function showLastThirtyDays(): void
+    {
+        $this->fromDate = now()->subDays(29)->toDateString();
+        $this->toDate = now()->toDateString();
+    }
+
+    public function showMonthToDate(): void
+    {
+        $this->fromDate = now()->startOfMonth()->toDateString();
+        $this->toDate = now()->toDateString();
+    }
+
     #[Computed]
     public function summaryData(): array
     {

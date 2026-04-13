@@ -7,7 +7,7 @@ use App\Models\DailyProductSalesSummary;
 use App\Models\DailySalesSummary;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
-use Illuminate\Support\CarbonPeriod;
+use Carbon\CarbonPeriod;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 

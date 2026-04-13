@@ -3,6 +3,10 @@
 namespace Tests\Feature\Reporting;
 
 use App\Enums\RoleEnum;
+use App\Filament\Widgets\Reports\CategorySalesDistributionChart;
+use App\Filament\Widgets\Reports\SalesAmountTrendChart;
+use App\Filament\Widgets\Reports\SalesQuantityTrendChart;
+use App\Filament\Widgets\Reports\TopProductsChart;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,6 +45,20 @@ class ReportPageAccessTest extends TestCase
         foreach ($this->reportRoutes() as $route) {
             $this->get($route)->assertOk();
         }
+    }
+
+    public function test_sudo_users_can_view_reporting_charts(): void
+    {
+        $sudo = $this->makeSudo([
+            'email_verified_at' => now(),
+        ]);
+
+        $this->actingAs($sudo);
+
+        $this->assertTrue(SalesAmountTrendChart::canView());
+        $this->assertTrue(SalesQuantityTrendChart::canView());
+        $this->assertTrue(CategorySalesDistributionChart::canView());
+        $this->assertTrue(TopProductsChart::canView());
     }
 
     public function test_users_without_roles_cannot_access_reporting_pages(): void
