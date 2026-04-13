@@ -11,6 +11,14 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        if (app()->environment('local')) {
+            $this->call([
+                ApplicationDemoSeeder::class,
+            ]);
+
+            return;
+        }
+
         $this->call([
             RoleSeeder::class,
         ]);

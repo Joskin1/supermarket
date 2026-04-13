@@ -2,14 +2,21 @@
 
 namespace Database\Seeders;
 
+use App\Actions\Audit\RecordActivityAction;
+use App\Actions\Inventory\CreateStockAdjustmentAction;
 use App\Actions\Inventory\CreateStockEntryAction;
+use App\Actions\Maintenance\CreateBackupSnapshotAction;
+use App\Actions\Reporting\RefreshAllSummariesAction;
 use App\Actions\Sales\ApplySalesRecordToInventoryAction;
 use App\Enums\RoleEnum;
 use App\Enums\SalesImportBatchStatus;
+use App\Models\BackupRun;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\SalesImportBatch;
+use App\Models\StockAdjustment;
 use App\Models\StockEntry;
+use App\Models\SystemSetting;
 use App\Models\User;
 use App\Support\SalesImport\DailySalesTemplateColumns;
 use Carbon\CarbonImmutable;
@@ -28,10 +35,14 @@ class ApplicationDemoSeeder extends Seeder
 
         $this->seedDemoSudo();
         $users = $this->seedUsers();
+        $this->seedSystemSettings($users);
         $products = $this->seedCatalog();
 
         $this->seedStockHistory($products, $users);
         $this->seedSalesImports($products, $users);
+        $this->seedStockAdjustments($products, $users);
+        app(RefreshAllSummariesAction::class)->fullRebuild();
+        $this->seedBackupSnapshot($users);
     }
 
     /**
@@ -65,7 +76,7 @@ class ApplicationDemoSeeder extends Seeder
 
     protected function seedDemoSudo(): void
     {
-        $email = env('DEMO_SUDO_EMAIL', 'demo-sudo@supermarket.test');
+        $email = env('DEMO_SUDO_EMAIL', 'akinjoseph221@gmail.com');
         $password = env('DEMO_SUDO_PASSWORD', 'password');
 
         /** @var User $sudo */
@@ -193,6 +204,39 @@ class ApplicationDemoSeeder extends Seeder
     }
 
     /**
+     * @param  array<string, User>  $users
+     */
+    protected function seedSystemSettings(array $users): void
+    {
+        $settings = SystemSetting::current();
+        $settings->fill([
+            'business_name' => 'Akin Joseph Supermarket',
+            'business_timezone' => 'Africa/Lagos',
+            'currency_code' => 'NGN',
+            'low_stock_contact_email' => 'akinjoseph221@gmail.com',
+            'receipt_footer' => 'Thank you for shopping with Akin Joseph Supermarket.',
+        ]);
+
+        $shouldLog = $settings->wasRecentlyCreated || $settings->isDirty();
+
+        if ($shouldLog) {
+            $settings->save();
+
+            app(RecordActivityAction::class)->execute(
+                event: 'system_settings.seeded',
+                description: 'Local demo system settings were prepared.',
+                subject: $settings,
+                properties: [
+                    'business_name' => $settings->business_name,
+                    'business_timezone' => $settings->business_timezone,
+                    'currency_code' => $settings->currency_code,
+                ],
+                actor: $users['sudo']->id,
+            );
+        }
+    }
+
+    /**
      * @param  array<string, Product>  $products
      * @param  array<string, User>  $users
      */
@@ -306,6 +350,85 @@ class ApplicationDemoSeeder extends Seeder
                     'updated_at' => $processedAt ?? $uploadedAt,
                 ]);
         }
+    }
+
+    /**
+     * @param  array<string, Product>  $products
+     * @param  array<string, User>  $users
+     */
+    protected function seedStockAdjustments(array $products, array $users): void
+    {
+        $catalog = array_values($products);
+
+        if ($catalog === []) {
+            return;
+        }
+
+        $firstProduct = $catalog[0]->fresh();
+        $secondProduct = ($catalog[1] ?? $catalog[0])->fresh();
+
+        $adjustments = [
+            [
+                'product' => $firstProduct,
+                'adjustment_method' => 'quantity_change',
+                'quantity_change' => $firstProduct->current_stock >= 2 ? -2 : 4,
+                'reason' => $firstProduct->current_stock >= 2
+                    ? 'Damaged units removed after shelf inspection.'
+                    : 'Emergency top-up added after opening stock review.',
+                'reference' => 'ADJ-DEMO-DAMAGE-001',
+                'note' => 'Local demo adjustment for loss control review.',
+                'adjustment_date' => CarbonImmutable::today()->subDays(1)->toDateString(),
+                'adjusted_by' => $users['inventory_admin']->id,
+            ],
+            [
+                'product' => $secondProduct,
+                'adjustment_method' => 'counted_stock',
+                'counted_stock' => $secondProduct->current_stock > 0
+                    ? max(0, $secondProduct->current_stock - 1)
+                    : 6,
+                'reason' => 'Physical stock count reconciliation.',
+                'reference' => 'ADJ-DEMO-COUNT-001',
+                'note' => 'Local demo adjustment after manual shelf count.',
+                'adjustment_date' => CarbonImmutable::today()->toDateString(),
+                'adjusted_by' => $users['inventory_admin']->id,
+            ],
+        ];
+
+        foreach ($adjustments as $adjustment) {
+            if (StockAdjustment::query()->where('reference', $adjustment['reference'])->exists()) {
+                continue;
+            }
+
+            /** @var Product $product */
+            $product = $adjustment['product'];
+
+            app(CreateStockAdjustmentAction::class)->execute([
+                'product_id' => $product->id,
+                'adjustment_method' => $adjustment['adjustment_method'],
+                'counted_stock' => $adjustment['counted_stock'] ?? null,
+                'quantity_change' => $adjustment['quantity_change'] ?? null,
+                'reason' => $adjustment['reason'],
+                'reference' => $adjustment['reference'],
+                'note' => $adjustment['note'],
+                'adjustment_date' => $adjustment['adjustment_date'],
+                'adjusted_by' => $adjustment['adjusted_by'],
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, User>  $users
+     */
+    protected function seedBackupSnapshot(array $users): void
+    {
+        if (BackupRun::query()->where('note', 'Local demo seed recovery snapshot')->exists()) {
+            return;
+        }
+
+        app(CreateBackupSnapshotAction::class)->execute(
+            createdBy: $users['sudo']->id,
+            note: 'Local demo seed recovery snapshot',
+        );
     }
 
     protected function makeSalesCsvRow(

@@ -28,7 +28,6 @@ ddev start
 ddev composer install
 ddev npm install
 ddev exec php artisan migrate --seed
-ddev exec php artisan users:bootstrap-sudo owner@example.com --name="Store Owner" --password="replace-this-password"
 ddev npm run build
 ```
 
@@ -37,8 +36,8 @@ ddev npm run build
 ```bash
 ddev exec php artisan migrate
 ddev exec php artisan db:seed
-ddev exec php artisan users:bootstrap-sudo owner@example.com --name="Store Owner" --password="replace-this-password"
 ddev exec php artisan db:seed --class=InventoryDevelopmentSeeder
+ddev exec php artisan users:bootstrap-sudo owner@example.com --name="Store Owner" --password="replace-this-password"
 ddev exec php artisan test
 ddev npm run dev
 ```
@@ -48,6 +47,19 @@ ddev npm run dev
 - App URL: `http://supermarket.test`
 - Filament admin: `http://supermarket.test/admin`
 - Mailpit: `http://supermarket.test:8025`
+
+## Local Demo Credentials
+
+When `APP_ENV=local`, `php artisan migrate --seed` now provisions the full demo dataset automatically so you can exercise the whole system in development.
+
+- `sudo`: `akinjoseph221@gmail.com` / `password`
+- `admin`: `store-manager@supermarket.test` / `password`
+- `admin`: `inventory-admin@supermarket.test` / `password`
+- `admin`: `sales-admin@supermarket.test` / `password`
+
+Login happens through Filament at `http://supermarket.test/admin/login`.
+
+Seeded privileged users are email-verified for development. Two-factor authentication is currently disabled, so verified users can continue straight into the admin panel after login.
 
 ## Roles
 
@@ -114,12 +126,22 @@ For realistic local data, run:
 ddev exec php artisan db:seed --class=InventoryDevelopmentSeeder
 ```
 
-This optional seeder creates supermarket-style categories, products, and sample stock entries without replacing the default bootstrap seeding.
-It also creates local-only sample users and sales data for demos, so it should not be used as a production bootstrap step.
+In local development, `php artisan db:seed` already runs the same full demo dataset automatically. This explicit seeder remains useful when you want to repopulate the demo data into an existing local database without changing the environment.
+
+The demo dataset includes:
+
+- roles, sudo, and admin users
+- product categories and products
+- stock entries and stock adjustments
+- sales import batches, successes, and failures
+- reporting summaries
+- system settings
+- activity log data created through the real actions
+- a sample recovery backup snapshot
 
 ## Bootstrap Sudo User
 
-Create the first sudo user explicitly:
+For non-local environments, create the first sudo user explicitly:
 
 ```bash
 ddev exec php artisan users:bootstrap-sudo owner@example.com --name="Store Owner" --password="replace-this-password"
