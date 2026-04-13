@@ -28,12 +28,15 @@ class EmailVerificationTest extends TestCase
         $response->assertRedirectContains('email-verification');
     }
 
-    public function test_verified_user_can_access_admin_panel(): void
+    public function test_verified_user_with_confirmed_two_factor_can_access_admin_panel(): void
     {
         $this->seed(RoleSeeder::class);
 
         $user = User::factory()->create([
             'email_verified_at' => now(),
+            'two_factor_secret' => encrypt('test-secret'),
+            'two_factor_recovery_codes' => encrypt(json_encode(['code-1', 'code-2'])),
+            'two_factor_confirmed_at' => now(),
         ]);
         $user->assignRole('sudo');
 

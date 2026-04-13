@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Enums\RoleEnum;
 use App\Models\User;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -23,5 +25,17 @@ class DashboardTest extends TestCase
 
         $response = $this->get(route('dashboard'));
         $response->assertOk();
+    }
+
+    public function test_privileged_users_are_redirected_from_dashboard_to_admin(): void
+    {
+        $this->seed(RoleSeeder::class);
+
+        $user = User::factory()->create();
+        $user->assignRole(RoleEnum::ADMIN->value);
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertRedirect('/admin');
     }
 }

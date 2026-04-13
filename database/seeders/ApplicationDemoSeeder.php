@@ -24,9 +24,9 @@ class ApplicationDemoSeeder extends Seeder
     {
         $this->call([
             RoleSeeder::class,
-            SudoUserSeeder::class,
         ]);
 
+        $this->seedDemoSudo();
         $users = $this->seedUsers();
         $products = $this->seedCatalog();
 
@@ -41,7 +41,7 @@ class ApplicationDemoSeeder extends Seeder
     {
         /** @var User $sudo */
         $sudo = User::query()
-            ->where('email', env('SUDO_EMAIL', 'akinjoseph221@gmail.com'))
+            ->role(RoleEnum::SUDO->value)
             ->firstOrFail();
 
         $users = [
@@ -61,6 +61,30 @@ class ApplicationDemoSeeder extends Seeder
         ];
 
         return $users;
+    }
+
+    protected function seedDemoSudo(): void
+    {
+        $email = env('DEMO_SUDO_EMAIL', 'demo-sudo@supermarket.test');
+        $password = env('DEMO_SUDO_PASSWORD', 'password');
+
+        /** @var User $sudo */
+        $sudo = User::query()->firstOrCreate(
+            ['email' => $email],
+            [
+                'name' => 'Demo Sudo',
+                'password' => Hash::make($password),
+                'email_verified_at' => now(),
+            ],
+        );
+
+        if (! $sudo->email_verified_at) {
+            $sudo->forceFill([
+                'email_verified_at' => now(),
+            ])->save();
+        }
+
+        $sudo->syncRoles([RoleEnum::SUDO->value]);
     }
 
     protected function upsertAdminUser(string $name, string $email): User

@@ -6,22 +6,24 @@ use App\Enums\RoleEnum;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use InvalidArgumentException;
 
 class SudoUserSeeder extends Seeder
 {
-    private const DEFAULT_EMAIL = 'akinjoseph221@gmail.com';
-
-    private const DEFAULT_PASSWORD = 'akinjoseph221@gmail.com';
-
     private const DEFAULT_NAME = 'Supermarket Sudo';
 
     public function run(): void
     {
-        $email = env('SUDO_EMAIL', self::DEFAULT_EMAIL);
-        $password = env('SUDO_PASSWORD', self::DEFAULT_PASSWORD);
+        $email = env('SUDO_EMAIL');
+        $password = env('SUDO_PASSWORD');
 
-        // Development bootstrap only. Production should replace these defaults
-        // with secure environment-driven credentials or a separate onboarding flow.
+        if (blank($email) || blank($password)) {
+            throw new InvalidArgumentException(
+                'SUDO_EMAIL and SUDO_PASSWORD must be set before running SudoUserSeeder. '
+                .'Use the users:bootstrap-sudo command for explicit onboarding instead.'
+            );
+        }
+
         $sudoUser = User::firstOrCreate(
             ['email' => $email],
             [

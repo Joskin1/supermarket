@@ -19,7 +19,10 @@ class SalesAdminPagesTest extends TestCase
     {
         $this->seed(RoleSeeder::class);
 
-        $admin = User::factory()->create();
+        $admin = User::factory()->create(array_merge(
+            ['email_verified_at' => now()],
+            $this->confirmedTwoFactorAttributes(),
+        ));
         $admin->assignRole(RoleEnum::ADMIN->value);
 
         $this->actingAs($admin);
@@ -34,11 +37,10 @@ class SalesAdminPagesTest extends TestCase
 
     public function test_sudo_users_can_visit_the_sales_pages(): void
     {
-        $this->seed();
-
-        $sudoUser = User::query()
-            ->where('email', env('SUDO_EMAIL', 'akinjoseph221@gmail.com'))
-            ->firstOrFail();
+        $sudoUser = $this->makeSudo(array_merge(
+            ['email_verified_at' => now()],
+            $this->confirmedTwoFactorAttributes(),
+        ));
 
         $this->actingAs($sudoUser);
 

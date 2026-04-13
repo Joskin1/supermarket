@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Users\Pages;
 
+use App\Actions\Audit\RecordActivityAction;
 use App\Actions\Users\SendUserEmailVerificationAction;
 use App\Filament\Resources\Users\UserResource;
 use Filament\Notifications\Notification;
@@ -21,6 +22,16 @@ class CreateUser extends CreateRecord
         $record = parent::handleRecordCreation($data);
         $record->syncRoles([$role]);
         app(SendUserEmailVerificationAction::class)->execute($record, markAsUnverified: true);
+        app(RecordActivityAction::class)->execute(
+            event: 'user.created',
+            description: 'A new user account was created.',
+            subject: $record,
+            properties: [
+                'user_id' => $record->id,
+                'email' => $record->email,
+                'role' => $role,
+            ],
+        );
 
         return $record;
     }

@@ -3,17 +3,25 @@
 namespace App\Providers;
 
 use App\Enums\RoleEnum;
+use App\Models\ActivityLog;
+use App\Models\BackupRun;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\SalesImportBatch;
 use App\Models\SalesRecord;
+use App\Models\StockAdjustment;
 use App\Models\StockEntry;
+use App\Models\SystemSetting;
 use App\Models\User;
+use App\Policies\ActivityLogPolicy;
+use App\Policies\BackupRunPolicy;
 use App\Policies\CategoryPolicy;
 use App\Policies\ProductPolicy;
 use App\Policies\SalesImportBatchPolicy;
 use App\Policies\SalesRecordPolicy;
+use App\Policies\StockAdjustmentPolicy;
 use App\Policies\StockEntryPolicy;
+use App\Policies\SystemSettingPolicy;
 use App\Policies\UserPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
@@ -74,10 +82,14 @@ class AppServiceProvider extends ServiceProvider
     protected function configureAuthorization(): void
     {
         Gate::policy(Category::class, CategoryPolicy::class);
+        Gate::policy(ActivityLog::class, ActivityLogPolicy::class);
+        Gate::policy(BackupRun::class, BackupRunPolicy::class);
         Gate::policy(Product::class, ProductPolicy::class);
         Gate::policy(SalesImportBatch::class, SalesImportBatchPolicy::class);
         Gate::policy(SalesRecord::class, SalesRecordPolicy::class);
+        Gate::policy(StockAdjustment::class, StockAdjustmentPolicy::class);
         Gate::policy(StockEntry::class, StockEntryPolicy::class);
+        Gate::policy(SystemSetting::class, SystemSettingPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
 
         Gate::before(function (User $user, string $ability): ?bool {

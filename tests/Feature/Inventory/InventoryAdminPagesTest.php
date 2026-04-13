@@ -16,7 +16,10 @@ class InventoryAdminPagesTest extends TestCase
     {
         $this->seed(RoleSeeder::class);
 
-        $admin = User::factory()->create();
+        $admin = User::factory()->create(array_merge(
+            ['email_verified_at' => now()],
+            $this->confirmedTwoFactorAttributes(),
+        ));
         $admin->assignRole(RoleEnum::ADMIN->value);
 
         $this->actingAs($admin);
@@ -24,20 +27,21 @@ class InventoryAdminPagesTest extends TestCase
         $this->get('/admin/categories')->assertOk();
         $this->get('/admin/products')->assertOk();
         $this->get('/admin/stock-entries')->assertOk();
+        $this->get('/admin/stock-adjustments')->assertOk();
     }
 
     public function test_sudo_users_can_visit_the_inventory_resource_pages(): void
     {
-        $this->seed();
-
-        $sudoUser = User::query()
-            ->where('email', env('SUDO_EMAIL', 'akinjoseph221@gmail.com'))
-            ->firstOrFail();
+        $sudoUser = $this->makeSudo(array_merge(
+            ['email_verified_at' => now()],
+            $this->confirmedTwoFactorAttributes(),
+        ));
 
         $this->actingAs($sudoUser);
 
         $this->get('/admin/categories')->assertOk();
         $this->get('/admin/products')->assertOk();
         $this->get('/admin/stock-entries')->assertOk();
+        $this->get('/admin/stock-adjustments')->assertOk();
     }
 }

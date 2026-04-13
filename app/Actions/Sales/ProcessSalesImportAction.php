@@ -2,6 +2,7 @@
 
 namespace App\Actions\Sales;
 
+use App\Actions\Audit\RecordActivityAction;
 use App\Actions\Reporting\RefreshAllSummariesAction;
 use App\Enums\SalesImportBatchStatus;
 use App\Imports\SalesImportSpreadsheet;
@@ -10,6 +11,7 @@ use App\Support\SalesImport\DailySalesTemplateColumns;
 use App\Support\SalesImport\SalesImportHeadingValidator;
 use App\Support\SalesImport\SalesImportRowProcessor;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
@@ -33,15 +35,21 @@ class ProcessSalesImportAction
         ])->save();
 
         try {
-            $this->validateHeadings($batch);
+            $batch = DB::transaction(function () use ($batch): SalesImportBatch {
+                $this->validateHeadings($batch);
 
-            Excel::import(
-                new SalesImportSpreadsheet($batch, $this->rowProcessor),
-                $batch->file_path,
-                'local',
-            );
+                Excel::import(
+                    new SalesImportSpreadsheet($batch, $this->rowProcessor),
+                    $batch->file_path,
+                    'local',
+                );
 
-            return $this->finalizeBatch($batch);
+                return $this->finalizeBatch($batch);
+            });
+
+            $this->refreshReportingSummaries($batch);
+
+            return $batch;
         } catch (ValidationException $exception) {
             return $this->markAsFailed(
                 $batch,
@@ -133,7 +141,21 @@ class ProcessSalesImportAction
             'processed_at' => now(),
         ])->save();
 
-        $this->refreshReportingSummaries($batch);
+        app(RecordActivityAction::class)->execute(
+            event: 'sales_import_batch.processed',
+            description: 'Sales import batch '.$batch->batch_code.' finished with status '.str($status->value)->replace('_', ' ')->lower().'.',
+            subject: $batch,
+            properties: [
+                'batch_code' => $batch->batch_code,
+                'status' => $status->value,
+                'successful_rows' => $successfulRows,
+                'failed_rows' => $failedRows,
+                'total_rows' => $totalRows,
+                'total_quantity_sold' => $totalQuantitySold,
+                'total_sales_amount' => $totalSalesAmount,
+            ],
+            actor: $batch->uploaded_by,
+        );
 
         return $batch->fresh(['uploader']);
     }
@@ -145,6 +167,18 @@ class ProcessSalesImportAction
             'processed_at' => now(),
             'notes' => $this->mergeNotes($batch->notes, $message),
         ])->save();
+
+        app(RecordActivityAction::class)->execute(
+            event: 'sales_import_batch.failed',
+            description: 'Sales import batch '.$batch->batch_code.' failed during processing.',
+            subject: $batch,
+            properties: [
+                'batch_code' => $batch->batch_code,
+                'status' => SalesImportBatchStatus::FAILED->value,
+                'message' => $message,
+            ],
+            actor: $batch->uploaded_by,
+        );
 
         return $batch->fresh(['uploader']);
     }

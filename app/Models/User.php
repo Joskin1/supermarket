@@ -64,6 +64,11 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmailContr
         return $this->hasRole(RoleEnum::ADMIN->value);
     }
 
+    public function hasConfirmedTwoFactorAuthentication(): bool
+    {
+        return $this->hasEnabledTwoFactorAuthentication() && filled($this->two_factor_confirmed_at);
+    }
+
     public function uploadedSalesImportBatches(): HasMany
     {
         return $this->hasMany(SalesImportBatch::class, 'uploaded_by');
@@ -72,5 +77,15 @@ class User extends Authenticatable implements FilamentUser, MustVerifyEmailContr
     public function salesRecords(): HasMany
     {
         return $this->hasMany(SalesRecord::class, 'created_by');
+    }
+
+    public function stockEntries(): HasMany
+    {
+        return $this->hasMany(StockEntry::class, 'created_by');
+    }
+
+    public function stockAdjustments(): HasMany
+    {
+        return $this->hasMany(StockAdjustment::class, 'adjusted_by');
     }
 }

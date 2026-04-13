@@ -24,11 +24,14 @@ new #[Title('Security settings')] class extends Component {
 
     public bool $requiresConfirmation;
 
+    public bool $showAdminPanelTwoFactorNotice = false;
+
     /**
      * Mount the component.
      */
     public function mount(DisableTwoFactorAuthentication $disableTwoFactorAuthentication): void
     {
+        $this->showAdminPanelTwoFactorNotice = request()->boolean('enforce2fa');
         $this->canManageTwoFactor = Features::canManageTwoFactorAuthentication();
 
         if ($this->canManageTwoFactor) {
@@ -92,6 +95,12 @@ new #[Title('Security settings')] class extends Component {
     <flux:heading class="sr-only">{{ __('Security settings') }}</flux:heading>
 
     <x-pages::settings.layout :heading="__('Update password')" :subheading="__('Ensure your account is using a long, random password to stay secure')">
+        @if ($showAdminPanelTwoFactorNotice)
+            <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+                {{ __('Enable and confirm two-factor authentication before returning to the admin panel.') }}
+            </div>
+        @endif
+
         <form method="POST" wire:submit="updatePassword" class="mt-6 space-y-6">
             <flux:input
                 wire:model="current_password"

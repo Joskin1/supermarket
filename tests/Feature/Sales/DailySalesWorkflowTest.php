@@ -53,7 +53,7 @@ class DailySalesWorkflowTest extends TestCase
 
     public function test_valid_row_creates_sales_record_deducts_stock_and_persists_sale_time(): void
     {
-        $admin = $this->makeAdmin();
+        $admin = $this->makeAdmin(withConfirmedTwoFactor: true);
         $product = $this->makeProduct(['sku' => 'SKU-001', 'current_stock' => 10]);
 
         $batch = app(CreateSalesImportBatchAction::class)->execute([
@@ -338,8 +338,7 @@ class DailySalesWorkflowTest extends TestCase
 
     public function test_sales_import_batches_are_accessible_to_admin_users(): void
     {
-        $this->seed();
-        $admin = $this->makeAdmin();
+        $admin = $this->makeAdmin(withConfirmedTwoFactor: true);
 
         $this->actingAs($admin);
 
@@ -353,11 +352,10 @@ class DailySalesWorkflowTest extends TestCase
 
     public function test_sales_import_batches_are_accessible_to_sudo_users(): void
     {
-        $this->seed();
-
-        $sudo = User::query()
-            ->where('email', env('SUDO_EMAIL', 'akinjoseph221@gmail.com'))
-            ->firstOrFail();
+        $sudo = $this->makeSudo(array_merge(
+            ['email_verified_at' => now()],
+            $this->confirmedTwoFactorAttributes(),
+        ));
 
         $this->actingAs($sudo);
 
@@ -381,11 +379,15 @@ class DailySalesWorkflowTest extends TestCase
             ->assertForbidden();
     }
 
-    private function makeAdmin(): User
+    private function makeAdmin(bool $withConfirmedTwoFactor = false): User
     {
         $this->seed(RoleSeeder::class);
 
-        $admin = User::factory()->create();
+        $attributes = $withConfirmedTwoFactor
+            ? array_merge(['email_verified_at' => now()], $this->confirmedTwoFactorAttributes())
+            : [];
+
+        $admin = User::factory()->create($attributes);
         $admin->assignRole(RoleEnum::ADMIN->value);
 
         return $admin;

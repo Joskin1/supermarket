@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\SalesImportBatch;
 use App\Models\SalesRecord;
 use App\Services\SalesReportingService;
+use App\Services\SalesTrendService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -78,6 +79,74 @@ class ReportingServiceTest extends TestCase
         $this->assertSame('Groceries', $categories->first()->category_snapshot);
         $this->assertSame(5000.0, (float) $categories->first()->total_sales_amount);
         $this->assertSame(62.5, $categories->first()->sales_share_percentage);
+    }
+
+    public function test_category_reporting_preserves_distinct_snapshots_when_category_ids_are_missing(): void
+    {
+        $batch = SalesImportBatch::factory()->processed()->create();
+        $fallbackCategory = Category::factory()->create(['name' => 'Household']);
+
+        $softDrinks = Product::factory()->create([
+            'category_id' => $fallbackCategory->id,
+            'name' => 'Orange Soda',
+            'sku' => 'SKU-ORANGE-SODA',
+            'selling_price' => 700,
+        ]);
+
+        $snacks = Product::factory()->create([
+            'category_id' => $fallbackCategory->id,
+            'name' => 'Plantain Chips',
+            'sku' => 'SKU-PLANTAIN-CHIPS',
+            'selling_price' => 900,
+        ]);
+
+        SalesRecord::factory()
+            ->for($softDrinks, 'product')
+            ->for($batch, 'batch')
+            ->state([
+                'product_code_snapshot' => $softDrinks->sku,
+                'product_name_snapshot' => $softDrinks->name,
+                'category_snapshot' => 'Soft Drinks',
+                'unit_price' => 700,
+                'quantity_sold' => 2,
+                'total_amount' => 1400,
+                'sales_date' => '2026-04-10',
+            ])
+            ->create();
+
+        SalesRecord::factory()
+            ->for($snacks, 'product')
+            ->for($batch, 'batch')
+            ->state([
+                'product_code_snapshot' => $snacks->sku,
+                'product_name_snapshot' => $snacks->name,
+                'category_snapshot' => 'Snacks',
+                'unit_price' => 900,
+                'quantity_sold' => 3,
+                'total_amount' => 2700,
+                'sales_date' => '2026-04-10',
+            ])
+            ->create();
+
+        app(RefreshAllSummariesAction::class)->fullRebuild();
+
+        $categoryPerformance = app(SalesReportingService::class)->categoryPerformance(
+            CarbonImmutable::parse('2026-04-10'),
+            CarbonImmutable::parse('2026-04-10'),
+        );
+
+        $this->assertSame(['Snacks', 'Soft Drinks'], $categoryPerformance->pluck('category_snapshot')->all());
+        $this->assertSame([2700.0, 1400.0], $categoryPerformance->map(
+            fn (object $row): float => (float) $row->total_sales_amount,
+        )->all());
+
+        $distribution = app(SalesTrendService::class)->categoryDistribution(
+            CarbonImmutable::parse('2026-04-10'),
+            CarbonImmutable::parse('2026-04-10'),
+        );
+
+        $this->assertSame(['Snacks', 'Soft Drinks'], $distribution['labels']);
+        $this->assertSame([2700.0, 1400.0], $distribution['values']);
     }
 
     /**

@@ -2,7 +2,10 @@
 
 namespace Tests\Feature\Settings;
 
+use App\Enums\RoleEnum;
+use App\Filament\Pages\PanelSecurity;
 use App\Models\User;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Fortify\Features;
@@ -59,6 +62,51 @@ class SecurityTest extends TestCase
             ->assertOk()
             ->assertSee('Update password')
             ->assertDontSee('Two-factor authentication');
+    }
+
+    public function test_privileged_users_without_confirmed_two_factor_are_redirected_from_admin_panel(): void
+    {
+        $this->seed(RoleSeeder::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+        $user->assignRole(RoleEnum::ADMIN->value);
+
+        $this->actingAs($user)
+            ->get('/admin')
+            ->assertRedirect(PanelSecurity::getUrl(['enforce2fa' => 1], isAbsolute: false, panel: 'admin'));
+    }
+
+    public function test_privileged_users_with_confirmed_two_factor_can_access_admin_panel(): void
+    {
+        $this->seed(RoleSeeder::class);
+
+        $user = User::factory()->withTwoFactor()->create([
+            'email_verified_at' => now(),
+            'two_factor_confirmed_at' => now(),
+        ]);
+        $user->assignRole(RoleEnum::ADMIN->value);
+
+        $this->actingAs($user)
+            ->get('/admin')
+            ->assertOk();
+    }
+
+    public function test_privileged_users_can_manage_two_factor_inside_the_admin_panel(): void
+    {
+        $this->seed(RoleSeeder::class);
+
+        $user = User::factory()->create([
+            'email_verified_at' => now(),
+        ]);
+        $user->assignRole(RoleEnum::ADMIN->value);
+
+        $this->actingAs($user)
+            ->get(PanelSecurity::getUrl(panel: 'admin', isAbsolute: false))
+            ->assertOk()
+            ->assertSee('Two-factor authentication')
+            ->assertSee('Enable 2FA');
     }
 
     public function test_two_factor_authentication_disabled_when_confirmation_abandoned_between_requests(): void

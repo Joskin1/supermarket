@@ -5,7 +5,15 @@ use Illuminate\Support\Facades\Route;
 Route::view('/', 'welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::view('dashboard', 'dashboard')->name('dashboard');
+    Route::get('dashboard', function () {
+        $user = request()->user();
+
+        if ($user?->isAdmin() || $user?->isSudo()) {
+            return redirect('/admin');
+        }
+
+        return view('dashboard');
+    })->name('dashboard');
 });
 
 require __DIR__.'/settings.php';

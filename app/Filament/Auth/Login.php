@@ -3,7 +3,6 @@
 namespace App\Filament\Auth;
 
 use Filament\Auth\Pages\Login as BaseLogin;
-use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 
 class Login extends BaseLogin

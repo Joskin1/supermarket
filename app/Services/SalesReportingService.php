@@ -187,14 +187,14 @@ class SalesReportingService
 
         $rows = DailyCategorySalesSummary::query()
             ->select([
-                'category_id',
-                DB::raw('MIN(category_snapshot) as category_snapshot'),
+                'category_snapshot',
+                DB::raw('MIN(category_id) as category_id'),
                 DB::raw('SUM(total_quantity_sold) as total_quantity_sold'),
                 DB::raw('SUM(total_sales_amount) as total_sales_amount'),
                 DB::raw('SUM(transactions_count) as transactions_count'),
             ])
             ->whereBetween('sales_date', [$from->toDateString(), $to->toDateString()])
-            ->groupBy('category_id')
+            ->groupBy('category_snapshot')
             ->orderByDesc('total_sales_amount')
             ->orderByDesc('total_quantity_sold')
             ->get();

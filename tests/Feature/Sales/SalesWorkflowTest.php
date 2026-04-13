@@ -2,13 +2,19 @@
 
 namespace Tests\Feature\Sales;
 
+use App\Actions\Reporting\RefreshAllSummariesAction;
+use App\Actions\Sales\ApplySalesRecordToInventoryAction;
 use App\Actions\Sales\CreateSalesImportBatchAction;
 use App\Actions\Sales\ProcessSalesImportAction;
 use App\Enums\SalesImportBatchStatus;
 use App\Exports\DailySalesTemplateExport;
 use App\Models\Product;
+use App\Models\SalesImportBatch;
 use App\Models\User;
 use App\Support\SalesImport\DailySalesTemplateColumns;
+use App\Support\SalesImport\SalesImportHeadingValidator;
+use App\Support\SalesImport\SalesImportRowProcessor;
+use App\Support\SalesImport\SalesImportRowValidator;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -16,6 +22,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
+use RuntimeException;
 use Tests\Feature\Sales\Concerns\BuildsDailySalesWorkbook;
 use Tests\TestCase;
 
@@ -359,5 +366,75 @@ class SalesWorkflowTest extends TestCase
                 $exception->errors()['file'][0] ?? '',
             );
         }
+    }
+
+    public function test_fatal_import_failure_rolls_back_previously_imported_rows_and_stock_changes(): void
+    {
+        $uploader = User::factory()->create();
+        $product = Product::factory()->create([
+            'sku' => 'SKU-ROLLBACK-1001',
+            'selling_price' => 1750,
+            'current_stock' => 8,
+        ]);
+
+        $batch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $this->makeSalesWorkbookUpload(
+                [
+                    $this->salesEntryRow([
+                        'date' => '2026-04-10',
+                        'product_code' => $product->sku,
+                        'product_name' => $product->name,
+                        'unit_price' => 1750,
+                        'quantity_sold' => 2,
+                    ]),
+                    $this->salesEntryRow([
+                        'date' => '2026-04-10',
+                        'product_code' => $product->sku,
+                        'product_name' => $product->name,
+                        'unit_price' => 1750,
+                        'quantity_sold' => 1,
+                    ]),
+                ],
+                [$this->referenceRowForProduct($product)],
+            ),
+            'uploaded_by' => $uploader->id,
+        ]);
+
+        $realRowProcessor = app(SalesImportRowProcessor::class);
+
+        $crashingRowProcessor = new class($realRowProcessor) extends SalesImportRowProcessor
+        {
+            public function __construct(protected SalesImportRowProcessor $inner)
+            {
+                parent::__construct(
+                    app(SalesImportRowValidator::class),
+                    app(ApplySalesRecordToInventoryAction::class),
+                );
+            }
+
+            protected int $calls = 0;
+
+            public function process(SalesImportBatch $batch, array $row, int $rowNumber): void
+            {
+                $this->calls++;
+
+                if ($this->calls === 2) {
+                    throw new RuntimeException('Simulated fatal import crash.');
+                }
+
+                $this->inner->process($batch, $row, $rowNumber);
+            }
+        };
+
+        $processedBatch = (new ProcessSalesImportAction(
+            app(SalesImportHeadingValidator::class),
+            $crashingRowProcessor,
+            app(RefreshAllSummariesAction::class),
+        ))->execute($batch);
+
+        $this->assertSame(SalesImportBatchStatus::FAILED, $processedBatch->status);
+        $this->assertSame(8, $product->fresh()->current_stock);
+        $this->assertDatabaseCount('sales_records', 0);
+        $this->assertDatabaseCount('sales_import_failures', 0);
     }
 }

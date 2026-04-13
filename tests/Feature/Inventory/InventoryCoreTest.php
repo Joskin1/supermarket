@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\Inventory;
 
+use App\Actions\Inventory\CreateStockAdjustmentAction;
 use App\Actions\Inventory\CreateStockEntryAction;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\StockAdjustment;
 use App\Models\StockEntry;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -275,6 +277,111 @@ class InventoryCoreTest extends TestCase
         $this->assertDatabaseCount('stock_entries', 2);
         $this->assertSame(10, $product->current_stock);
         $this->assertSame([$product->id], StockEntry::query()->pluck('product_id')->unique()->values()->all());
+    }
+
+    public function test_stock_adjustment_can_reconcile_to_a_counted_stock_level(): void
+    {
+        $product = $this->createProduct([
+            'current_stock' => 12,
+        ]);
+
+        $adjustment = app(CreateStockAdjustmentAction::class)->execute([
+            'product_id' => $product->id,
+            'adjustment_method' => 'counted_stock',
+            'counted_stock' => 9,
+            'reason' => 'Physical stock count correction',
+            'adjustment_date' => '2026-04-12',
+            'reference' => 'COUNT-0001',
+        ]);
+
+        $product->refresh();
+
+        $this->assertSame(-3, $adjustment->quantity_change);
+        $this->assertSame(12, $adjustment->previous_stock);
+        $this->assertSame(9, $adjustment->new_stock);
+        $this->assertSame(9, $product->current_stock);
+        $this->assertDatabaseHas('stock_adjustments', [
+            'id' => $adjustment->id,
+            'product_id' => $product->id,
+            'counted_stock' => 9,
+            'reason' => 'Physical stock count correction',
+        ]);
+    }
+
+    public function test_stock_adjustment_can_apply_a_manual_quantity_change(): void
+    {
+        $product = $this->createProduct([
+            'current_stock' => 4,
+        ]);
+
+        $adjustment = app(CreateStockAdjustmentAction::class)->execute([
+            'product_id' => $product->id,
+            'adjustment_method' => 'quantity_change',
+            'quantity_change' => 6,
+            'reason' => 'Recovered stock returned to shelf',
+            'adjustment_date' => '2026-04-12',
+        ]);
+
+        $product->refresh();
+
+        $this->assertSame(10, $product->current_stock);
+        $this->assertSame(6, $adjustment->quantity_change);
+        $this->assertSame(10, $adjustment->new_stock);
+    }
+
+    public function test_stock_adjustment_cannot_reduce_stock_below_zero(): void
+    {
+        $product = $this->createProduct([
+            'current_stock' => 2,
+        ]);
+
+        $this->expectException(ValidationException::class);
+
+        app(CreateStockAdjustmentAction::class)->execute([
+            'product_id' => $product->id,
+            'adjustment_method' => 'quantity_change',
+            'quantity_change' => -3,
+            'reason' => 'Damaged items removed',
+            'adjustment_date' => '2026-04-12',
+        ]);
+    }
+
+    public function test_stock_adjustment_creation_is_transactional(): void
+    {
+        $product = $this->createProduct([
+            'current_stock' => 8,
+        ]);
+
+        $action = new class extends CreateStockAdjustmentAction
+        {
+            protected function afterStockAdjustmentCreated(StockAdjustment $adjustment, Product $product, array $data): void
+            {
+                throw new RuntimeException('Simulated failure after stock adjustment creation.');
+            }
+        };
+
+        try {
+            $action->execute([
+                'product_id' => $product->id,
+                'adjustment_method' => 'quantity_change',
+                'quantity_change' => -2,
+                'reason' => 'Damaged items removed',
+                'adjustment_date' => '2026-04-12',
+                'reference' => 'ADJ-ROLLBACK-0001',
+            ]);
+
+            $this->fail('The action should have thrown an exception.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Simulated failure after stock adjustment creation.', $exception->getMessage());
+        }
+
+        $product->refresh();
+
+        $this->assertSame(8, $product->current_stock);
+        $this->assertDatabaseCount('stock_adjustments', 0);
+        $this->assertDatabaseMissing('stock_adjustments', [
+            'reference' => 'ADJ-ROLLBACK-0001',
+        ]);
     }
 
     private function createCategory(array $overrides = []): Category

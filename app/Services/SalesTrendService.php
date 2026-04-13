@@ -52,11 +52,11 @@ class SalesTrendService
 
         $rows = DailyCategorySalesSummary::query()
             ->select([
-                DB::raw('MIN(category_snapshot) as category_snapshot'),
+                'category_snapshot',
                 DB::raw('SUM(total_sales_amount) as total_sales_amount'),
             ])
             ->whereBetween('sales_date', [$from->toDateString(), $to->toDateString()])
-            ->groupBy('category_id')
+            ->groupBy('category_snapshot')
             ->orderByDesc('total_sales_amount')
             ->get();
 

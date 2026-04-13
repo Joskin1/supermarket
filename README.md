@@ -28,6 +28,7 @@ ddev start
 ddev composer install
 ddev npm install
 ddev exec php artisan migrate --seed
+ddev exec php artisan users:bootstrap-sudo owner@example.com --name="Store Owner" --password="replace-this-password"
 ddev npm run build
 ```
 
@@ -36,6 +37,7 @@ ddev npm run build
 ```bash
 ddev exec php artisan migrate
 ddev exec php artisan db:seed
+ddev exec php artisan users:bootstrap-sudo owner@example.com --name="Store Owner" --password="replace-this-password"
 ddev exec php artisan db:seed --class=InventoryDevelopmentSeeder
 ddev exec php artisan test
 ddev npm run dev
@@ -73,6 +75,37 @@ The intended operating flow is:
 
 `current_stock` is stored on the `products` table for fast reads, while every replenishment remains preserved in `stock_entries` for history and future Excel-driven workflows.
 
+Stock corrections now belong in `Stock Adjustments`, which keeps a separate ledger for damage write-offs, shrinkage, and physical stock-count reconciliation without rewriting product history.
+
+## Operational Trust Layer
+
+The admin panel now includes:
+
+- `Stock Adjustments`: controlled inventory corrections and count reconciliation
+- `Activity Log`: read-only trace of critical inventory, sales import, backup, and settings events
+- `System Settings`: sudo-only business configuration
+- `Backups`: sudo-only backup history and on-demand recovery snapshots
+
+These features are intended for controlled operational use, not demo scaffolding.
+
+## Backup & Recovery
+
+Create a private recovery snapshot with either of these entry points:
+
+```bash
+ddev exec php artisan backups:create --note="Before weekend close"
+```
+
+Or use the `Backups` page in Filament as a sudo user.
+
+Backup files are stored on the private local disk under `storage/app/private/backups/...` and tracked in the `backup_runs` table. Each snapshot is a JSON bundle of the first-party business tables plus metadata such as the business name, timezone, and generated timestamp.
+
+For recovery planning:
+
+1. Keep the private backup files and the database dump strategy under sudo control.
+2. Use the latest successful `backup_runs` record to identify the snapshot path and checksum.
+3. Restore into a clean environment, then review system settings, privileged users, and the activity log before reopening operations.
+
 ## Development Inventory Seeder
 
 For realistic local data, run:
@@ -82,15 +115,17 @@ ddev exec php artisan db:seed --class=InventoryDevelopmentSeeder
 ```
 
 This optional seeder creates supermarket-style categories, products, and sample stock entries without replacing the default bootstrap seeding.
+It also creates local-only sample users and sales data for demos, so it should not be used as a production bootstrap step.
 
 ## Bootstrap Sudo User
 
-The database seeder automatically creates a development bootstrap sudo user.
+Create the first sudo user explicitly:
 
-- Email: `akinjoseph221@gmail.com`
-- Password: `akinjoseph221@gmail.com`
+```bash
+ddev exec php artisan users:bootstrap-sudo owner@example.com --name="Store Owner" --password="replace-this-password"
+```
 
-These defaults are for local development only. Override them with `SUDO_EMAIL` and `SUDO_PASSWORD`, and do not keep these credentials for production deployments.
+This keeps the default seed path safe while still giving the team a clear onboarding step for the first privileged account.
 
 ## Auth Notes
 

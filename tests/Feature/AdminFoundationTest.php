@@ -8,18 +8,34 @@ use Database\Seeders\RoleSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class AdminFoundationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_database_seeder_bootstraps_the_sudo_user_with_the_sudo_role(): void
+    public function test_database_seeder_only_bootstraps_roles_by_default(): void
     {
         $this->seed();
 
+        $this->assertDatabaseCount('users', 0);
+        $this->assertNotNull(Role::findByName(RoleEnum::SUDO->value, 'web'));
+        $this->assertNotNull(Role::findByName(RoleEnum::ADMIN->value, 'web'));
+    }
+
+    public function test_bootstrap_sudo_command_creates_a_verified_sudo_user(): void
+    {
+        $this->seed(RoleSeeder::class);
+
+        $this->artisan('users:bootstrap-sudo', [
+            'email' => 'owner@example.com',
+            '--name' => 'Store Owner',
+            '--password' => 'StrongPassword!123',
+        ])->assertSuccessful();
+
         $sudoUser = User::query()
-            ->where('email', 'akinjoseph221@gmail.com')
+            ->where('email', 'owner@example.com')
             ->first();
 
         $this->assertNotNull($sudoUser);
@@ -52,14 +68,12 @@ class AdminFoundationTest extends TestCase
 
     public function test_only_sudo_users_can_manage_users(): void
     {
-        $this->seed();
+        $this->seed(RoleSeeder::class);
 
         $admin = User::factory()->create();
         $admin->assignRole(RoleEnum::ADMIN->value);
 
-        $sudoUser = User::query()
-            ->where('email', 'akinjoseph221@gmail.com')
-            ->firstOrFail();
+        $sudoUser = $this->makeSudo();
 
         $this->assertFalse(Gate::forUser($admin)->allows('viewAny', User::class));
         $this->assertTrue(Gate::forUser($sudoUser)->allows('viewAny', User::class));

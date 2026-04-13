@@ -2,6 +2,7 @@
 
 namespace App\Actions\Inventory;
 
+use App\Actions\Audit\RecordActivityAction;
 use App\Models\Product;
 use App\Models\StockEntry;
 use Illuminate\Support\Facades\DB;
@@ -57,6 +58,21 @@ class CreateStockEntryAction
             }
 
             $product->save();
+
+            app(RecordActivityAction::class)->execute(
+                event: 'stock_entry.created',
+                description: 'Stock was added to '.$product->name.'.',
+                subject: $stockEntry,
+                properties: [
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'quantity_added' => (int) $data['quantity_added'],
+                    'previous_stock' => $product->current_stock - (int) $data['quantity_added'],
+                    'new_stock' => (int) $product->current_stock,
+                    'reference' => $data['reference'] ?? null,
+                ],
+                actor: $data['created_by'] ?? null,
+            );
 
             return $stockEntry->fresh(['product.category', 'creator']);
         });

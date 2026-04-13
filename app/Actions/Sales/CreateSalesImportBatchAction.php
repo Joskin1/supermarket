@@ -2,6 +2,7 @@
 
 namespace App\Actions\Sales;
 
+use App\Actions\Audit\RecordActivityAction;
 use App\Enums\SalesImportBatchStatus;
 use App\Models\SalesImportBatch;
 use Illuminate\Http\UploadedFile;
@@ -60,7 +61,7 @@ class CreateSalesImportBatchAction
             'local',
         );
 
-        return SalesImportBatch::query()->create([
+        $batch = SalesImportBatch::query()->create([
             'batch_code' => $this->generateBatchCode(),
             'file_name' => basename($storedPath),
             'file_path' => $storedPath,
@@ -69,7 +70,21 @@ class CreateSalesImportBatchAction
             'uploaded_by' => $data['uploaded_by'],
             'status' => SalesImportBatchStatus::UPLOADED,
             'notes' => $data['notes'] ?? null,
-        ])->fresh('uploader');
+        ]);
+
+        app(RecordActivityAction::class)->execute(
+            event: 'sales_import_batch.uploaded',
+            description: 'A sales workbook was uploaded for processing.',
+            subject: $batch,
+            properties: [
+                'batch_code' => $batch->batch_code,
+                'original_file_name' => $batch->original_file_name,
+                'file_hash' => $fileHash,
+            ],
+            actor: (int) $data['uploaded_by'],
+        );
+
+        return $batch->fresh('uploader');
     }
 
     protected function generateBatchCode(): string
