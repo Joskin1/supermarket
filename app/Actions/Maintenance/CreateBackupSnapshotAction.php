@@ -5,6 +5,7 @@ namespace App\Actions\Maintenance;
 use App\Actions\Audit\RecordActivityAction;
 use App\Models\BackupRun;
 use App\Models\SystemSetting;
+use App\Support\Maintenance\BackupSnapshotTables;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -15,29 +16,12 @@ use Throwable;
 
 class CreateBackupSnapshotAction
 {
-    /**
-     * @var array<int, string>
-     */
-    protected array $tables = [
-        'categories',
-        'products',
-        'stock_entries',
-        'stock_adjustments',
-        'sales_import_batches',
-        'sales_records',
-        'sales_import_failures',
-        'daily_sales_summaries',
-        'daily_product_sales_summaries',
-        'daily_category_sales_summaries',
-        'system_settings',
-        'activity_logs',
-    ];
-
     public function execute(?int $createdBy = null, ?string $note = null): BackupRun
     {
         $timestamp = now();
         $backupCode = $this->generateBackupCode();
         $settings = SystemSetting::current();
+        $tables = BackupSnapshotTables::all();
         $businessSlug = Str::slug($settings->business_name ?: config('app.name')) ?: 'supermarket';
         $fileName = $businessSlug.'-backup-'.$timestamp->format('Y-m-d-His').'.json';
         $filePath = 'backups/'.$timestamp->format('Y/m').'/'.$fileName;
@@ -62,9 +46,9 @@ class CreateBackupSnapshotAction
                     'business_timezone' => $settings->business_timezone,
                     'currency_code' => $settings->currency_code,
                     'app_env' => app()->environment(),
-                    'tables' => $this->tables,
+                    'tables' => $tables,
                 ],
-                'tables' => $this->tableSnapshots(),
+                'tables' => $this->tableSnapshots($tables),
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
             if ($payload === false) {
@@ -133,11 +117,15 @@ class CreateBackupSnapshotAction
     /**
      * @return array<string, Collection<int, array<string, mixed>>>
      */
-    protected function tableSnapshots(): array
+    /**
+     * @param array<int, string> $tables
+     * @return array<string, Collection<int, array<string, mixed>>>
+     */
+    protected function tableSnapshots(array $tables): array
     {
         $snapshots = [];
 
-        foreach ($this->tables as $table) {
+        foreach ($tables as $table) {
             $query = DB::table($table);
 
             if (Schema::hasColumn($table, 'id')) {
