@@ -6,13 +6,16 @@ use App\Actions\Audit\RecordActivityAction;
 use App\Models\BackupRun;
 use App\Support\Maintenance\BackupSnapshotTables;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Throwable;
 
 class RestoreBackupSnapshotAction
 {
+    public function __construct(
+        protected CreateBackupSnapshotAction $createBackupSnapshot,
+    ) {}
+
     public function execute(BackupRun $backupRun, ?int $restoredBy = null, ?string $note = null): void
     {
         if ($backupRun->status !== 'completed') {
@@ -47,26 +50,33 @@ class RestoreBackupSnapshotAction
             throw new RuntimeException('The backup is missing data for: '.implode(', ', $missingTables).'.');
         }
 
-        DB::beginTransaction();
-        Schema::disableForeignKeyConstraints();
+        $snapshotType = $payload['metadata']['snapshot_type'] ?? null;
+
+        if (($snapshotType !== null) && ($snapshotType !== 'business_data')) {
+            throw new RuntimeException('Only supported business-data snapshots can be restored.');
+        }
+
+        // Safety: create a snapshot of the current state before restoring.
+        // Placed after validation so we only snapshot when the restore is going to proceed.
+        $this->createBackupSnapshot->execute(
+            createdBy: $restoredBy,
+            note: 'Auto-created before restoring business snapshot '.$backupRun->backup_code.'.',
+        );
 
         try {
-            foreach ($tables as $table) {
-                $this->truncateTable($table);
-                $this->restoreTable($table, $payload['tables'][$table] ?? []);
-            }
+            DB::transaction(function () use ($tables, $payload): void {
+                $this->deleteCurrentRows();
 
-            Schema::enableForeignKeyConstraints();
-            DB::commit();
+                foreach ($tables as $table) {
+                    $this->restoreTable($table, $payload['tables'][$table] ?? []);
+                }
+            });
         } catch (Throwable $exception) {
-            Schema::enableForeignKeyConstraints();
-            DB::rollBack();
-
             report($exception);
 
             app(RecordActivityAction::class)->execute(
                 event: 'backup.restore_failed',
-                description: 'A recovery backup snapshot failed to restore.',
+                description: 'A business-data recovery snapshot failed to restore.',
                 subject: $backupRun,
                 properties: [
                     'backup_code' => $backupRun->backup_code,
@@ -81,7 +91,7 @@ class RestoreBackupSnapshotAction
 
         app(RecordActivityAction::class)->execute(
             event: 'backup.restored',
-            description: 'A recovery backup snapshot was restored.',
+            description: 'A business-data recovery snapshot was restored.',
             subject: $backupRun,
             properties: [
                 'backup_code' => $backupRun->backup_code,
@@ -92,17 +102,15 @@ class RestoreBackupSnapshotAction
         );
     }
 
-    protected function truncateTable(string $table): void
+    protected function deleteCurrentRows(): void
     {
-        try {
-            DB::table($table)->truncate();
-        } catch (Throwable) {
+        foreach (BackupSnapshotTables::restoreDeleteOrder() as $table) {
             DB::table($table)->delete();
         }
     }
 
     /**
-     * @param array<int, array<string, mixed>> $rows
+     * @param  array<int, array<string, mixed>>  $rows
      */
     protected function restoreTable(string $table, array $rows): void
     {
@@ -111,7 +119,51 @@ class RestoreBackupSnapshotAction
         }
 
         foreach (array_chunk($rows, 500) as $chunk) {
-            DB::table($table)->insert($chunk);
+            DB::table($table)->insert(array_map(
+                fn (array $row): array => $this->prepareRowForRestore($table, $row),
+                $chunk,
+            ));
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    protected function prepareRowForRestore(string $table, array $row): array
+    {
+        return match ($table) {
+            'sales_import_batches' => $this->normalizeUserReference($row, 'uploaded_by'),
+            'sales_records' => $this->normalizeUserReference($row, 'created_by'),
+            'stock_entries' => $this->normalizeUserReference($row, 'created_by'),
+            'stock_adjustments' => $this->normalizeUserReference($row, 'adjusted_by'),
+            'activity_logs' => $this->normalizeUserReference($row, 'actor_id'),
+            default => $row,
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return array<string, mixed>
+     */
+    protected function normalizeUserReference(array $row, string $column): array
+    {
+        if (! array_key_exists($column, $row)) {
+            return $row;
+        }
+
+        $userId = $row[$column];
+
+        if (blank($userId)) {
+            $row[$column] = null;
+
+            return $row;
+        }
+
+        $row[$column] = DB::table('users')->where('id', $userId)->exists()
+            ? $userId
+            : null;
+
+        return $row;
     }
 }

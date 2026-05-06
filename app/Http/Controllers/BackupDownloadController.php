@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Audit\RecordActivityAction;
 use App\Enums\RoleEnum;
 use App\Models\BackupRun;
 use Illuminate\Http\Request;
@@ -26,6 +27,17 @@ class BackupDownloadController extends Controller
         if (! Storage::disk($disk)->exists($filePath)) {
             abort(404);
         }
+
+        app(RecordActivityAction::class)->execute(
+            event: 'backup.downloaded',
+            description: 'A recovery backup snapshot was downloaded.',
+            subject: $backupRun,
+            properties: [
+                'backup_code' => $backupRun->backup_code,
+                'file_path' => $backupRun->file_path,
+            ],
+            actor: $user->id,
+        );
 
         return Storage::disk($disk)->download(
             $filePath,
