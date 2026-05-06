@@ -2,7 +2,6 @@
 
 namespace App\Providers;
 
-use App\Enums\RoleEnum;
 use App\Models\ActivityLog;
 use App\Models\BackupRun;
 use App\Models\Category;
@@ -27,6 +26,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Compiler\CacheManager as LivewireCacheManager;
@@ -55,6 +55,10 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->configureAuthorization();
+
+        if (app()->isProduction()) {
+            URL::forceScheme('https');
+        }
     }
 
     /**
@@ -68,14 +72,14 @@ class AppServiceProvider extends ServiceProvider
             app()->isProduction(),
         );
 
-        Password::defaults(fn (): ?Password => app()->isProduction()
+        Password::defaults(fn (): Password => app()->isProduction()
             ? Password::min(12)
                 ->mixedCase()
                 ->letters()
                 ->numbers()
                 ->symbols()
                 ->uncompromised()
-            : null,
+            : Password::min(8),
         );
     }
 
@@ -91,9 +95,5 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(StockEntry::class, StockEntryPolicy::class);
         Gate::policy(SystemSetting::class, SystemSettingPolicy::class);
         Gate::policy(User::class, UserPolicy::class);
-
-        Gate::before(function (User $user, string $ability): ?bool {
-            return $user->hasRole(RoleEnum::SUDO->value) ? true : null;
-        });
     }
 }

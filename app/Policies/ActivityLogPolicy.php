@@ -9,12 +9,12 @@ class ActivityLogPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->isSudo() || $user->isAdmin();
     }
 
     public function view(User $user, ActivityLog $activityLog): bool
     {
-        return $user->isAdmin();
+        return $user->isSudo() || $user->isAdmin();
     }
 
     public function create(User $user): bool

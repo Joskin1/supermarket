@@ -8,6 +8,6 @@ trait AuthorizesInventoryAccess
 {
     protected function canManageInventory(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->isSudo() || $user->isAdmin();
     }
 }

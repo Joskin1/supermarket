@@ -8,6 +8,6 @@ trait AuthorizesSalesAccess
 {
     protected function canManageSales(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->isSudo() || $user->isAdmin();
     }
 }
