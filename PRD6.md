@@ -1,539 +1,396 @@
-You are my senior Laravel + Filament engineer.
-
-I need you to redesign the Daily Sales Excel workflow in my supermarket system and implement the changes cleanly, safely, and step by step.
-
-Work like a careful senior engineer:
-- think before changing code
-- inspect the current implementation first
-- do not guess route names, page methods, or existing architecture
-- keep changes production-minded
-- keep the code scalable and testable
-- do not move to the next task until the current task is finished and verified
-
-Very important:
-All work must be done in ATOMIC TASKS.
-Each task must be completed, verified, and summarized before moving to the next one.
-
-==================================================
-PROJECT CONTEXT
-==================================================
-
-Stack:
-- Laravel
-- Filament
-- MySQL
-- Docker
-- Laravel Excel / PhpSpreadsheet if already in use
-
-Current supermarket workflow already includes:
-- categories
-- products
-- stock entries
-- current stock tracking
-- sales import batches
-- daily sales import/export
-- sales records
-- reporting
-
-==================================================
-THE PROBLEM TO FIX
-==================================================
-
-The current daily sales export/import workflow is not practical for real supermarket operations.
-
-Right now, the exported sales template is effectively encouraging a “one row per product for the whole day” style.
-
-That means if:
-- a customer buys 2 units of a product
-- and later another customer buys the same product again
-
-the staff would have to go back to the same row and edit:
-- quantity sold
-- total amount
-- maybe other values
-
-This is NOT good for real daily transaction entry.
-
-It is error-prone, confusing, and not audit-friendly.
-
-==================================================
-NEW WORKFLOW WE HAVE AGREED ON
-==================================================
-
-We are changing the sales file to a SALES LOG approach.
-
-Hard business rule:
-- every sale entry gets its own row
-- repeated sale of the same product must create a NEW ROW
-- staff must NEVER go back and overwrite a previous row for the same product
-
-Example:
-If Zara Gold Perfume is sold 3 different times in a day, it should appear on 3 separate rows.
-
-This is the new workflow and must be implemented exactly.
-
-==================================================
-NEW EXPORT STRUCTURE
-==================================================
-
-The exported workbook should now use TWO SHEETS.
-
---------------------------------------------------
-SHEET 1: Product Reference
---------------------------------------------------
-
-Purpose:
-A reference sheet for staff to see available products and codes.
-
-Required columns:
-- product_code
-- category
-- product_name
-- unit_price
-
-Rules:
-- include active products only
-- this sheet is for reference, not transaction entry
-- format it clearly
-- make it easy to read
-- if possible, freeze the header row
-- if sensible, make columns auto-width or readable
-- if easy and stable, protect this sheet from accidental edits
-
---------------------------------------------------
-SHEET 2: Sales Entry Log
---------------------------------------------------
-
-Purpose:
-This is the actual sheet staff will use throughout the day.
-
-Core rule:
-- one sale = one row
-- repeated sale of same product = another row
-- do not aggregate daily quantity manually in the file
-
-Required columns for the sales log:
-- date
-- time
-- product_code
-- product_name
-- unit_price
-- quantity_sold
-- total_amount
-- note
-
-Business meaning:
-- date = date of that sale entry
-- time = time of that sale entry
-- product_code = main identifier
-- product_name = display/reference value
-- unit_price = actual selling price used for that entry
-- quantity_sold = quantity sold in that specific transaction row
-- total_amount = unit_price × quantity_sold
-- note = optional
-
-==================================================
-IMPORTANT DESIGN DECISIONS
-==================================================
-
-1. product_code is the trusted identifier
-The system must rely primarily on product_code, not product_name.
-
-2. product_name is informational
-It can be auto-filled, lookup-filled, or validated lightly, but product_code is the authoritative key.
-
-3. unit_price should remain editable
-Because the actual selling price may differ in real life.
-Do NOT make it hard-locked to the current system price.
-However, it may be prefilled from the product reference/default product selling price.
-
-4. total_amount should be derived from unit_price × quantity_sold
-If formula support is stable, populate it automatically in the workbook.
-If formula support is not reliable enough, calculate and validate it during import.
-
-5. category is NOT required in the sales-entry sheet
-It already exists in the product reference sheet.
-Do not add unnecessary duplication to the entry sheet unless there is a very strong reason.
-
-==================================================
-PREFERRED UX IN THE EXCEL FILE
-==================================================
-
-If it can be implemented robustly with the current export stack, do this:
-
-For Sheet 2 (Sales Entry Log):
-- allow staff to enter product_code
-- automatically show/fill product_name from the reference sheet
-- optionally prefill unit_price from the reference sheet, but still allow edits
-- calculate total_amount automatically from unit_price × quantity_sold
-
-Use stable spreadsheet techniques only.
-Do NOT introduce fragile workbook behavior.
-
-If dropdowns or formulas become too brittle, the fallback is:
-- keep the workbook simple
-- keep the reference sheet accurate
-- rely on strong import validation
-
-But the primary goal must still be achieved:
-- one sale per row
-- repeat sales on separate rows
-- product_code-driven import
-
-==================================================
-IMPORT LOGIC CHANGES REQUIRED
-==================================================
-
-The import logic must be updated to support the new sales-log structure.
-
-New hard rules:
-
-1. The import must process EACH SALES ROW independently.
-2. The same product_code may appear multiple times in the same uploaded file.
-3. That is valid and expected.
-4. Blank rows should be skipped cleanly, without creating failures.
-5. Partially filled invalid rows should fail with clear reasons.
-6. Import must still create one tracked batch per uploaded file.
-7. Duplicate file protection must remain active.
-
-==================================================
-CRITICAL STOCK DEDUCTION RULE
-==================================================
-
-This is extremely important.
-
-If the same product appears multiple times in one uploaded file, stock deduction must respect row order and cumulative effect.
-
-Example 1:
-- current stock = 10
-- row 1 = quantity 3
-- row 2 = quantity 2
-Both should pass.
-Final stock = 5.
-
-Example 2:
-- current stock = 4
-- row 1 = quantity 3
-- row 2 = quantity 2
-Row 1 should pass.
-Row 2 should fail because remaining stock after row 1 is only 1.
-
-This means the importer must not validate every row only against the original database stock.
-It must process rows in order and maintain running stock state safely.
-
-Implement this carefully and transactionally.
-
-==================================================
-DATABASE / DOMAIN CHANGES TO CONSIDER
-==================================================
-
-Review the current schema and update it only where necessary.
-
-I want the cleanest design.
-
-Likely good changes include:
-
-1. Keep sales_date as DATE only
-Because this represents the day of the sale.
-
-2. Add sales_time as nullable TIME if not already present
-Because we now want one row per transaction entry and time matters.
-
-3. Consider adding source_row_number if useful
-This can help trace imported rows back to the uploaded file order.
-
-Do not make random schema changes.
-Inspect current migrations and models first, then decide the cleanest update.
-
-==================================================
-FILAMENT / UI CHANGES REQUIRED
-==================================================
-
-Update the Daily Sales Export page so the UI matches the new workflow.
-
-The page must no longer imply:
-- one row per product
-- edit quantity repeatedly on the same row
-
-Instead, it should clearly explain:
-1. download workbook
-2. use Product Reference sheet for guidance
-3. enter every sale on a new row in Sales Entry Log
-4. upload completed workbook
-5. system validates rows, stores valid rows, and flags invalid ones
-
-Also:
-- inspect the current page class before editing the Blade
-- do not call methods in Blade that do not exist in the page class
-- if helper methods like getDownloadUrl() or getUploadUrl() are needed, define them properly in the page class
-- verify actual route names before using them
-
-Make the page clean, readable, and professional in Filament.
-
-==================================================
-ATOMIC TASK PLAN
-==================================================
-
-Follow this exact order unless there is a strong technical reason not to.
-
---------------------------------------------------
-TASK 1 — Review Current Implementation
---------------------------------------------------
-
-Goal:
-Understand exactly how the current export/import workflow works before editing anything.
-
-Do:
-- inspect the Daily Sales Export page class
-- inspect the Daily Sales Export Blade view
-- inspect export classes
-- inspect import classes
-- inspect sales batch processing logic
-- inspect sales_records schema and model casts
-- inspect route names used for export/upload
-- inspect current tests covering sales workflow
-
-Output:
-Before changing code, clearly state:
-- how the current system works
-- where the “one row per product” behavior is enforced or implied
-- what parts must change
-- what parts can remain
-
-Do not proceed until this review is complete.
-
---------------------------------------------------
-TASK 2 — Redesign the Export Workbook Structure
---------------------------------------------------
-
-Goal:
-Change the export from the old structure to the new 2-sheet workbook.
-
-Implement:
-- Sheet 1: Product Reference
-- Sheet 2: Sales Entry Log
-
-Requirements:
-- Product Reference must include active products only
-- Sales Entry Log must support one sale per row
-- use the exact new sales-entry columns agreed above
-- make workbook output stable and readable
-
-If formulas / lookup helpers are added:
-- keep them simple and reliable
-- do not break compatibility for common Excel use
-
-Verify:
-- exported workbook has two sheets
-- headers are correct
-- sheet names are clean and clear
-- content matches business intent
-
-Do not move on until export structure is correct.
-
---------------------------------------------------
-TASK 3 — Update Import Validation for the New Sales Log
---------------------------------------------------
-
-Goal:
-Make the importer understand and validate the new row-per-sale format.
-
-Requirements:
-- accept multiple rows for the same product_code in one file
-- skip fully blank rows
-- fail partial invalid rows with clear reasons
-- validate:
-  - date
-  - time if present
-  - product_code exists
-  - quantity_sold > 0
-  - unit_price is numeric
-- do not rely on product_name as the authority
-
-Decide clearly how total_amount will be handled:
-- if present, verify it or normalize it
-- if missing, compute it from unit_price × quantity_sold
-
-Output:
-Explain the exact validation rules you chose and why.
-
-Verify:
-- importer accepts repeated product rows
-- importer skips blank template rows
-- invalid rows are recorded cleanly
-
---------------------------------------------------
-TASK 4 — Fix Stock Deduction Logic for Repeated Product Rows
---------------------------------------------------
-
-Goal:
-Make stock deduction correct when the same product appears many times in the same file.
-
-Requirements:
-- process rows in order
-- maintain running stock effect within the batch
-- do not validate each row only against original stock in DB
-- use transactions where appropriate
-- do not allow silent negative stock
-- if later row exceeds remaining stock after earlier valid rows, fail that later row only
-
-This task is critical.
-Handle it like a senior engineer.
-
-Verify using examples like:
-- stock 10 with rows 3 + 2 = both pass
-- stock 4 with rows 3 + 2 = first passes, second fails
-
-Do not move on until this logic is correct and tested.
-
---------------------------------------------------
-TASK 5 — Update Sales Record Persistence
---------------------------------------------------
-
-Goal:
-Store the new row-per-sale structure cleanly.
-
-Inspect whether the database/model needs changes.
-If needed, implement minimal clean updates such as:
-- sales_time
-- source_row_number
-
-Requirements:
-- preserve historical accuracy
-- keep product_code snapshot / product_name snapshot if already used
-- keep sales_date as date-only if that is the domain meaning
-- avoid mixing date and datetime incorrectly
-
-Verify:
-- persisted records match business meaning
-- model casts are correct
-- database assertions are stable
-
---------------------------------------------------
-TASK 6 — Update the Filament Daily Sales Export Page
---------------------------------------------------
-
-Goal:
-Make the UI explain the new workflow properly.
-
-Requirements:
-- explain the 2-sheet workbook clearly
-- explain that every sale must be entered on a new row
-- remove wording that implies editing the same row repeatedly
-- keep page professional and easy to understand
-- verify any Blade helper methods actually exist in the page class
-- verify route names before use
-- keep code clean
-
-Verify:
-- page loads without errors
-- buttons/routes work
-- workflow explanation matches the new behavior
-
---------------------------------------------------
-TASK 7 — Update Tests
---------------------------------------------------
-
-Goal:
-Update or add tests so the new workflow is protected.
-
-Add or update tests for:
-1. export produces a 2-sheet workbook
-2. product reference sheet contains active products only
-3. sales entry sheet has the new columns
-4. same product can appear multiple times in one import file
-5. repeated product rows are processed correctly
-6. running stock validation works across repeated rows in the same batch
-7. blank rows are skipped cleanly
-8. invalid partial rows create failures
-9. import batch totals remain correct
-10. duplicate upload protection still works
-11. UI/page behavior still loads correctly if covered
-
-Use meaningful assertions.
-Do not weaken tests just to make them pass.
-
---------------------------------------------------
-TASK 8 — Final QA and Cleanup
---------------------------------------------------
-
-Goal:
-Finish with a production-minded cleanup pass.
-
-Do:
-- review naming
-- review route usage
-- review page methods
-- review workbook sheet names and headings
-- review import error messages
-- review model casts and migrations
-- review transaction boundaries
-- remove dead code
-- update docs/comments if needed
-
-Then rerun the relevant test suite.
-
-==================================================
-IMPORTANT IMPLEMENTATION RULES
-==================================================
-
-1. Do not change everything at once blindly.
-2. Complete and verify each task before moving forward.
-3. Do not break other working sales features.
-4. Do not remove duplicate file protection.
-5. Do not remove batch tracking.
-6. Do not remove failure tracking.
-7. Do not keep any UI wording that suggests “edit the same row again later.”
-8. Keep code maintainable and production-minded.
-
-==================================================
-EXPECTED OUTPUT FORMAT
-==================================================
-
-For each atomic task:
-1. state the task name
-2. explain the goal
-3. inspect current code first
-4. make the change
-5. show key files changed
-6. explain why the change is correct
-7. verify the task before moving on
-
-At the end provide:
-
-A. Root summary
-- what changed in export
-- what changed in import
-- what changed in stock deduction
-- what changed in UI
-
-B. Files changed
-List all changed files.
-
-C. Verification summary
-Show:
-- export verified
-- import verified
-- repeated product rows verified
-- running stock logic verified
-- tests passing
-
-D. Any migration notes
-If schema changed, explain exactly what changed and why.
-
-==================================================
-FINAL INSTRUCTION
-==================================================
-
-Implement this redesign exactly as concluded:
-
-- use a 2-sheet workbook
-- use Product Reference sheet
-- use Sales Entry Log sheet
-- one sale = one row
-- repeated sale of same product = another new row
-- product_code is authoritative
-- unit_price remains editable
-- total_amount is derived from unit_price × quantity_sold
-- import must process repeated product rows correctly and safely
-- stock deduction must respect cumulative row order within the batch
+# 1. Executive Summary
+This system is not safe enough for a real public or client rollout yet.
+
+The core Laravel and Filament foundations are decent, and the role checks around admin pages are generally sensible, but there are still serious operational risks in backup/restore, sales import idempotency, production mail setup, and long-running synchronous processing.
+
+In simple English:
+- Is it safe enough now? Not fully. I did not find an obvious trivial admin-bypass in the areas reviewed, but I did find high-risk business integrity and recovery problems.
+- Is it production-ready now? No.
+- Is it scalable enough now? Not for larger daily use or larger imports.
+- Overall health: promising foundation, but still at controlled/private-use stage rather than launch stage.
+
+# 2. Launch Verdict
+Not ready for launch.
+
+Why:
+- the backup restore flow can leave the database in a partially erased or partially restored state
+- the “backup” feature is not a full recovery snapshot even though the UI wording sounds like it is
+- a corrected sales file can be imported again and double-post sales + stock changes
+- production onboarding can silently fail because email verification depends on mail, while the shipped production example uses log-only mail
+- large imports and reporting refreshes run synchronously in the web request, which is fragile under real usage
+
+In plain English: this app can look correct in demos, but still fail in the moments that matter most in real business use: recovery, corrections, and daily operations under load.
+
+# 3. Top Risks
+## Restore can leave the system half-restored or half-wiped
+Severity: CRITICAL
+
+Where:
+- `app/Actions/Maintenance/RestoreBackupSnapshotAction.php:61-75`
+- `app/Actions/Maintenance/RestoreBackupSnapshotAction.php:106-112`
+
+What is wrong:
+- The restore flow opens a transaction, then truncates tables one by one.
+- On MySQL, `TRUNCATE` causes an implicit commit and is not safely rollbackable the way normal row deletes are.
+- If restore fails mid-run, `rollBack()` does not guarantee the original state is preserved.
+
+Why it matters:
+- In real life, a failed restore can leave the shop with missing stock, missing sales, or broken reports instead of returning to the last known good state.
+
+How to fix it:
+- Stop using `truncate()` in the restore path.
+- Use a recovery strategy that is actually atomic for the target database.
+- Prefer restoring into a fresh database or staging schema, validating it, then switching over.
+- Add restore integration tests against the actual production database engine.
+
+What happens if ignored:
+- A restore attempt during an incident can make the incident worse and destroy trust in the recovery process.
+
+## “Backup restore” is not a full system recovery, but the UI strongly suggests it is
+Severity: HIGH
+
+Where:
+- `app/Support/Maintenance/BackupSnapshotTables.php:12-25`
+- `app/Filament/Resources/BackupRuns/Tables/BackupRunsTable.php:62-63`
+- `app/Filament/Resources/BackupRuns/Tables/BackupRunsTable.php:81-82`
+- `README.md:103-119`
+
+What is wrong:
+- The snapshot includes business tables only.
+- It excludes users, roles, permissions, backup history, sessions, jobs, and other operational tables.
+- The restore modal says it will replace current business data, and the success message says the system data has been restored.
+
+Why it matters:
+- In real life, an owner may believe they have a full disaster-recovery backup when they do not.
+- After a real failure, they may restore inventory and sales data but still be locked out or missing privileged user/role state.
+
+How to fix it:
+- Rename the feature clearly if it is only a business-data snapshot.
+- Or expand it into a true recovery mechanism that includes auth/role state and documented recovery guarantees.
+- Add an explicit restore checklist and warning in the UI before execution.
+
+What happens if ignored:
+- Recovery planning will be misleading, and disaster recovery will fail exactly when the business depends on it.
+
+## Corrected imports can double-post sales and deduct stock twice
+Severity: HIGH
+
+Where:
+- `app/Actions/Sales/CreateSalesImportBatchAction.php:41-56`
+- `app/Actions/Sales/ApplySalesRecordToInventoryAction.php:24-45`
+- `database/migrations/2026_04_10_005810_create_sales_records_table.php`
+
+What is wrong:
+- Duplicate protection is based on full-file hash only.
+- If staff upload a slightly changed workbook with mostly the same rows, it is treated as a new batch.
+- Each accepted row immediately creates a sales record and reduces stock again.
+- There is no business-level idempotency key or correction workflow.
+
+Why it matters:
+- In real life, staff often re-export, correct one row, and upload again.
+- This can inflate sales numbers and drive stock counts down twice.
+
+How to fix it:
+- Introduce an explicit correction/reversal workflow.
+- Add business-level uniqueness rules, for example around source batch identity plus source row identity, or a stronger import session model.
+- Require operators to replace or reverse an earlier batch before re-importing overlapping sales.
+
+What happens if ignored:
+- Stock and sales figures will drift from reality, and the error may not be obvious until much later.
+
+## Sales imports run synchronously in the request and rebuild reports immediately
+Severity: HIGH
+
+Where:
+- `app/Filament/Resources/SalesImportBatches/Pages/CreateSalesImportBatch.php:25-34`
+- `app/Actions/Sales/ProcessSalesImportAction.php:37-50`
+- `app/Actions/Sales/ProcessSalesImportAction.php:199-226`
+- `docs/infinityfree.env.example:25`
+
+What is wrong:
+- Upload processing happens inline during the Filament create request.
+- The workbook import itself runs inside a database transaction.
+- Reporting summaries are rebuilt immediately after the import.
+- The shipped production example uses `QUEUE_CONNECTION=sync`.
+
+Why it matters:
+- In real life, larger files or slower hosting can hit timeouts, long locks, or user-facing failures.
+- Staff may retry because the UI looks stuck, which makes operational mistakes more likely.
+
+How to fix it:
+- Move import processing and summary rebuilding to queued jobs.
+- Return a queued/processing state immediately in the UI.
+- Add retry-safe idempotent job logic and monitoring for failed imports.
+
+What happens if ignored:
+- Imports will become fragile as data volume grows, especially on low-cost hosting.
+
+## Email verification can silently fail in production because the shipped config is log-only
+Severity: HIGH
+
+Where:
+- `docs/infinityfree.env.example:29-35`
+- `config/mail.php:17`
+- `app/Filament/Resources/Users/Pages/CreateUser.php:21-27`
+- `app/Filament/Resources/Users/Pages/EditUser.php:35-39`
+
+What is wrong:
+- New users and changed emails trigger verification emails.
+- The production example env sets `MAIL_MAILER=log`.
+- The default mail config also falls back to `log`.
+
+Why it matters:
+- In real life, accounts can be created successfully, but the user never receives the verification email.
+- The operator may think the system is working while the new user is locked out.
+
+How to fix it:
+- Ship a production example with a real mail transport or with an explicit “must configure mail before launch” block.
+- Add a startup/health check that warns sudo users when the app is in production with log mailer.
+
+What happens if ignored:
+- New-user onboarding and email-change recovery will fail silently.
+
+## Reporting and low-stock pages are built with full in-memory collections and hard-coded currency
+Severity: MEDIUM
+
+Where:
+- `app/Services/SalesReportingService.php:45-57`
+- `app/Services/SalesReportingService.php:138-142`
+- `app/Services/SalesReportingService.php:188-200`
+- `app/Services/LowStockReportingService.php:17-23`
+- `app/Services/LowStockReportingService.php:58-86`
+- `app/Filament/Pages/Reports/BaseReportPage.php:28-31`
+- `app/Filament/Resources/SalesImportBatches/Tables/SalesImportBatchesTable.php:58-61`
+
+What is wrong:
+- Several report paths load entire result sets with `get()` and then aggregate in PHP.
+- Low-stock reporting loads full collections too.
+- Currency display is hard-coded to `NGN` instead of consistently using system settings.
+
+Why it matters:
+- In real life, reports slow down as history grows.
+- Hard-coded currency can mislead staff if the business setting changes.
+
+How to fix it:
+- Paginate or stream large result sets where possible.
+- Push more aggregation to SQL and consider summary tables for heavier views.
+- Resolve currency from `SystemSetting::current()` in one shared formatter.
+
+What happens if ignored:
+- Reports get slower over time and can eventually become operationally annoying or misleading.
+
+## System settings are treated like a singleton, but the database does not enforce singleton behavior
+Severity: MEDIUM
+
+Where:
+- `app/Models/SystemSetting.php:33-36`
+- `database/migrations/2026_04_13_000003_create_system_settings_table.php:11-18`
+
+What is wrong:
+- The app assumes one settings row and uses `firstOrCreate([] , defaults())`.
+- The table has no unique guard to enforce a single row.
+
+Why it matters:
+- In real life, manual inserts, bad seeds, or admin mistakes can create multiple settings rows.
+- Then “current settings” means “whichever row comes back first,” which is unpredictable.
+
+How to fix it:
+- Enforce singleton behavior at the database level.
+- Add a known primary row strategy or a unique sentinel column.
+- Add a data repair command for environments that already have duplicates.
+
+What happens if ignored:
+- The app can show or use inconsistent business identity, timezone, email, or currency data.
+
+# 4. Full Security Audit
+## Access control
+The sampled policy layer is mostly conservative:
+- `UserPolicy` is sudo-only for user management.
+- backup and system settings access are sudo-only.
+- inventory and sales resources are generally limited to `sudo` and `admin`.
+
+This is good, but there are still security-adjacent operational risks:
+- `ActivityLogPolicy` gives both admin and sudo access to all logs in `app/Policies/ActivityLogPolicy.php`. That may be acceptable, but review whether logs may contain sensitive operational notes or backup paths.
+- `BackupDownloadController` correctly checks sudo at runtime in `app/Http/Controllers/BackupDownloadController.php:16-34`. That part is good.
+
+Simple English:
+- I did not find an obvious route that lets a normal user reach admin data.
+- The bigger problems are around data safety and operational correctness, not a simple permission hole.
+
+## User management
+`CreateUser` and `EditUser` both send verification emails, which is correct, but this is operationally unsafe unless mail is configured correctly.
+
+Simple English:
+- The code expects email delivery to work.
+- The deployment example does not guarantee that.
+
+## File upload security
+The sales upload flow validates `.xlsx` MIME/extension and stores files on the private local disk, which is a good baseline.
+
+Remaining concerns:
+- there is no antivirus or deeper content scanning
+- file handling is still tied to a synchronous request path
+
+Simple English:
+- The upload restrictions are okay for a business spreadsheet flow.
+- The bigger issue is resilience, not classic upload RCE.
+
+## Sensitive data exposure
+Backup metadata exposes stored file paths in the UI table at `app/Filament/Resources/BackupRuns/Tables/BackupRunsTable.php:36-38`.
+
+Simple English:
+- This is not an internet-wide leak because the page is sudo-only.
+- But it still reveals internal storage structure to every sudo operator.
+
+## Seeded/dev credentials
+The README openly documents local demo credentials in `README.md` under “Local Demo Credentials.” The text clearly frames them as local-only, so this is not automatically a production flaw, but teams must ensure development seeders never run outside local.
+
+Simple English:
+- This is okay only if local/dev boundaries are enforced in deployment practice.
+
+# 5. Full Durability / Reliability Audit
+## Restore reliability is the largest weakness
+The restore path is not trustworthy enough for production because of `truncate()` inside a supposed transaction. This is the main launch blocker.
+
+## Import durability
+Good:
+- stock entry and stock adjustment actions are transactional
+- sales row application locks the product row before decrementing stock
+
+Weaknesses:
+- corrected imports can double-apply business events
+- the import flow records row failures and keeps going, which is operationally helpful, but it means a partially good file can still create a mixed state without a true correction workflow
+
+Simple English:
+- The app is careful about one row at a time.
+- It is not careful enough about the whole business event over multiple uploads.
+
+## Reporting durability
+Summary refresh failures are swallowed into notes in `app/Actions/Sales/ProcessSalesImportAction.php:212-225`.
+
+This is better than losing the sales data, but it still leaves a split-brain state:
+- sales are imported
+- reports may be stale
+- recovery is manual
+
+Simple English:
+- Your raw data may be right while your dashboards are wrong.
+- That is safer than losing data, but still dangerous operationally if people trust the reports.
+
+# 6. Full Scalability Audit
+## Import path
+The import is synchronous, transaction-heavy, and summary-rebuild-heavy. This will not scale well on modest hosting.
+
+Key pressure points:
+- workbook parsing in-request
+- per-row transactional stock updates
+- immediate summary rebuild on completion
+- sync queue in deployment example
+
+Simple English:
+- It may feel fine in testing and become painful once daily files get larger.
+
+## Reporting path
+The reporting services rely on eager `get()` calls over summary tables and then do further aggregation in memory.
+
+This is acceptable for small datasets, but not ideal for:
+- long historical ranges
+- multi-year growth
+- stores with larger product catalogs
+
+Simple English:
+- It works for “small business now,” not necessarily for “business growing over time.”
+
+## Low-stock reporting
+The low-stock service also loads full collections and does in-memory post-processing.
+
+Simple English:
+- This is unlikely to fail first, but it is still not built for large inventories.
+
+# 7. Full Production-Readiness Audit
+## Configuration hygiene
+Good:
+- `APP_DEBUG` is false in the production example
+- backup download is private and role-gated
+
+Weak:
+- production example uses `MAIL_MAILER=log`
+- production example uses `QUEUE_CONNECTION=sync`
+- production example uses `SESSION_DRIVER=file`, which is acceptable for single-node constrained hosting but not good for multi-node growth
+
+Simple English:
+- The shipped production example optimizes for simplicity, not robustness.
+
+## Backup and recovery readiness
+Not ready.
+
+The current feature is better described as a business-data export/import aid than a trustworthy disaster-recovery system.
+
+## Logging and auditability
+The activity log coverage is useful for key actions and is one of the stronger parts of the app.
+
+Limitations:
+- it does not solve restore trustworthiness
+- I did not see proof that every high-risk administrative action has a recovery-grade audit trail
+
+## Operational safety
+UI wording around restore is too strong for what the code guarantees.
+
+Simple English:
+- Operators may take dangerous actions because the wording sounds safer than the implementation really is.
+
+# 8. Code Quality / Maintainability / Wording Audit
+## Good
+- Actions are reasonably separated by domain
+- policies are easy to read
+- import validation is split into dedicated classes
+
+## Weaknesses
+- hard-coded `NGN` appears in shared reporting/UI formatting even though currency is configurable
+- singleton settings are modeled by convention instead of enforced design
+- backup wording over-promises the capability
+
+Simple English:
+- The codebase is organized well enough to keep improving.
+- Some wording and modeling choices can mislead both staff and future developers.
+
+# 9. Test Coverage Audit
+## What is well-tested
+- inventory stock entry/adjustment basics
+- sales import happy paths
+- some admin-page access rules
+- backup creation basics
+
+## What is not tested enough
+- restore success on the real production database engine
+- restore failure behavior mid-run
+- duplicate/corrected import protection at business-event level
+- stale-report scenarios after summary refresh failure
+- production mail misconfiguration detection
+- performance behavior for large imports and long-range reports
+
+## Where tests are giving false confidence
+- `tests/Feature/BackupSupportTest.php:26-88` verifies backup creation and page access, but not whether restore is actually safe
+- the import tests prove valid files work, but they do not prove correction workflows are safe
+
+## Important tests to add
+- restore integration tests against MySQL, including mid-restore failure cases
+- idempotency tests for corrected/re-uploaded sales files
+- queue/async import tests
+- stale summary detection tests
+- settings singleton enforcement tests
+
+# 10. Final Score
+5.2 / 10
+
+Reason:
+- strong enough foundation to continue from
+- decent use of actions, policies, and tests for core happy paths
+- but serious recovery, idempotency, and production-readiness gaps remain
+
+Recommended next step order:
+1. Rebuild backup/restore into a trustworthy recovery flow.
+2. Add a safe correction/idempotency model for sales imports.
+3. Move imports and summary refreshes to queued background jobs.
+4. Fix production deployment defaults for mail and operational checks.
+5. Enforce singleton system settings and remove hard-coded currency usage.

@@ -38,6 +38,7 @@ ddev exec php artisan migrate
 ddev exec php artisan db:seed
 ddev exec php artisan db:seed --class=InventoryDevelopmentSeeder
 ddev exec php artisan users:bootstrap-sudo owner@example.com --name="Store Owner" --password="replace-this-password"
+ddev exec php artisan queue:work --tries=1
 ddev exec php artisan test
 ddev npm run dev
 ```
@@ -96,13 +97,13 @@ The admin panel now includes:
 - `Stock Adjustments`: controlled inventory corrections and count reconciliation
 - `Activity Log`: read-only trace of critical inventory, sales import, backup, and settings events
 - `System Settings`: sudo-only business configuration
-- `Backups`: sudo-only backup history and on-demand recovery snapshots
+- `Backups`: sudo-only business-data snapshot history and recovery tooling
 
 These features are intended for controlled operational use, not demo scaffolding.
 
 ## Backup & Recovery
 
-Create a private recovery snapshot with either of these entry points:
+Create a private business-data snapshot with either of these entry points:
 
 ```bash
 ddev exec php artisan backups:create --note="Before weekend close"
@@ -112,11 +113,26 @@ Or use the `Backups` page in Filament as a sudo user.
 
 Backup files are stored on the private local disk under `storage/app/private/backups/...` and tracked in the `backup_runs` table. Each snapshot is a JSON bundle of the first-party business tables plus metadata such as the business name, timezone, and generated timestamp.
 
+Important scope note:
+
+1. These snapshots cover business data only.
+2. They do not restore users, roles, permissions, sessions, jobs, failed jobs, cache state, or backup history.
+3. Historical user-linked fields are preserved when matching user records still exist; otherwise those references are restored as `null`.
+4. Keep a proper database/server backup strategy for full disaster recovery.
+
 For recovery planning:
 
-1. Keep the private backup files and the database dump strategy under sudo control.
+1. Keep the private backup files and the full database/server backup strategy under sudo control.
 2. Use the latest successful `backup_runs` record to identify the snapshot path and checksum.
-3. Restore into a clean environment, then review system settings, privileged users, and the activity log before reopening operations.
+3. Restore into a clean environment when possible, then review system settings, privileged users, and the activity log before reopening operations.
+
+## Production Operations
+
+For real production use:
+
+1. Run a queue worker continuously so sales imports process in the background instead of inside web requests.
+2. Configure a real SMTP or API-based mail provider before creating or updating user accounts.
+3. Review the admin dashboard for production readiness alerts before go-live and after every environment change.
 
 ## Development Inventory Seeder
 
@@ -137,7 +153,7 @@ The demo dataset includes:
 - reporting summaries
 - system settings
 - activity log data created through the real actions
-- a sample recovery backup snapshot
+- a sample business-data recovery snapshot
 
 ## Bootstrap Sudo User
 
