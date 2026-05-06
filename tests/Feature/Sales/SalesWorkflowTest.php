@@ -368,6 +368,129 @@ class SalesWorkflowTest extends TestCase
         }
     }
 
+    public function test_modified_workbook_for_an_already_imported_sales_date_is_blocked_before_stock_changes(): void
+    {
+        $uploader = User::factory()->create();
+        $product = Product::factory()->create([
+            'sku' => 'SKU-OVERLAP-1001',
+            'selling_price' => 1750,
+            'current_stock' => 8,
+        ]);
+
+        $firstBatch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $this->makeSalesWorkbookUpload(
+                [
+                    $this->salesEntryRow([
+                        'date' => '2026-04-10',
+                        'time' => '09:30',
+                        'product_code' => $product->sku,
+                        'product_name' => $product->name,
+                        'unit_price' => 1750,
+                        'quantity_sold' => 2,
+                        'total_amount' => 3500,
+                    ]),
+                ],
+                [$this->referenceRowForProduct($product)],
+            ),
+            'uploaded_by' => $uploader->id,
+        ]);
+
+        $processedFirstBatch = app(ProcessSalesImportAction::class)->execute($firstBatch);
+
+        $this->assertSame(SalesImportBatchStatus::PROCESSED, $processedFirstBatch->status);
+        $this->assertSame(6, $product->fresh()->current_stock);
+
+        $secondBatch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $this->makeSalesWorkbookUpload(
+                [
+                    $this->salesEntryRow([
+                        'date' => '2026-04-10',
+                        'time' => '11:15',
+                        'product_code' => $product->sku,
+                        'product_name' => $product->name,
+                        'unit_price' => 1750,
+                        'quantity_sold' => 1,
+                        'total_amount' => 1750,
+                        'note' => 'Corrected workbook',
+                    ]),
+                ],
+                [$this->referenceRowForProduct($product)],
+            ),
+            'uploaded_by' => $uploader->id,
+        ]);
+
+        $processedSecondBatch = app(ProcessSalesImportAction::class)->execute($secondBatch);
+
+        $this->assertSame(SalesImportBatchStatus::FAILED, $processedSecondBatch->status);
+        $this->assertStringContainsString('prevent duplicate stock deductions', (string) $processedSecondBatch->notes);
+        $this->assertDatabaseCount('sales_records', 1);
+        $this->assertSame(6, $product->fresh()->current_stock);
+    }
+
+    public function test_overlap_guard_ignores_untouched_template_rows_with_cached_formula_values(): void
+    {
+        $uploader = User::factory()->create();
+        $product = Product::factory()->create([
+            'sku' => 'SKU-OVERLAP-CACHED-1001',
+            'selling_price' => 2400,
+            'current_stock' => 9,
+            'is_active' => true,
+        ]);
+
+        $existingBatch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $this->makeSalesWorkbookUpload(
+                [
+                    $this->salesEntryRow([
+                        'date' => '2026-04-10',
+                        'time' => '10:45',
+                        'product_code' => $product->sku,
+                        'product_name' => $product->name,
+                        'unit_price' => 2400,
+                        'quantity_sold' => 2,
+                        'total_amount' => 4800,
+                    ]),
+                ],
+                [$this->referenceRowForProduct($product)],
+            ),
+            'uploaded_by' => $uploader->id,
+        ]);
+
+        $this->assertSame(
+            SalesImportBatchStatus::PROCESSED,
+            app(ProcessSalesImportAction::class)->execute($existingBatch)->status,
+        );
+
+        $binary = Excel::raw(
+            new DailySalesTemplateExport(CarbonImmutable::parse('2026-04-10')),
+            \Maatwebsite\Excel\Excel::XLSX,
+        );
+
+        $spreadsheet = $this->loadSpreadsheetFromBinary($binary);
+        $sheet = $spreadsheet->getSheetByName(DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET);
+
+        foreach (['D2', 'E2', 'G2'] as $coordinate) {
+            $sheet?->getCell($coordinate)->setCalculatedValue(0);
+        }
+
+        $emptyUpload = UploadedFile::fake()->createWithContent(
+            'daily-sales-template.xlsx',
+            $this->saveSpreadsheetToBinary($spreadsheet),
+        );
+
+        $emptyBatch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $emptyUpload,
+            'uploaded_by' => $uploader->id,
+        ]);
+
+        $processedEmptyBatch = app(ProcessSalesImportAction::class)->execute($emptyBatch);
+
+        $this->assertSame(SalesImportBatchStatus::FAILED, $processedEmptyBatch->status);
+        $this->assertStringContainsString('did not contain any sales rows', (string) $processedEmptyBatch->notes);
+        $this->assertStringNotContainsString('prevent duplicate stock deductions', (string) $processedEmptyBatch->notes);
+        $this->assertDatabaseCount('sales_records', 1);
+        $this->assertSame(7, $product->fresh()->current_stock);
+    }
+
     public function test_fatal_import_failure_rolls_back_previously_imported_rows_and_stock_changes(): void
     {
         $uploader = User::factory()->create();
