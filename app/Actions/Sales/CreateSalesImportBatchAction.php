@@ -20,7 +20,7 @@ class CreateSalesImportBatchAction
     public function execute(array $input): SalesImportBatch
     {
         $data = Validator::make($input, [
-            'file' => ['bail', 'required', 'file', 'max:10240'],
+            'file' => ['bail', 'required', 'file', 'max:10240', 'mimes:xlsx'],
             'uploaded_by' => ['required', 'integer', 'exists:users,id'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ])->after(function ($validator) use ($input): void {
@@ -30,6 +30,7 @@ class CreateSalesImportBatchAction
                 return;
             }
 
+            // Defense-in-depth: verify real extension even after MIME check.
             if (strtolower($file->getClientOriginalExtension()) !== 'xlsx') {
                 $validator->errors()->add('file', 'The sales file must be an .xlsx workbook.');
             }
