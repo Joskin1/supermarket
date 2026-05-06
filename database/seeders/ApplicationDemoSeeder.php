@@ -29,6 +29,12 @@ class ApplicationDemoSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->isProduction()) {
+            $this->command?->warn('ApplicationDemoSeeder is disabled in production. Use SudoUserSeeder for bootstrap.');
+
+            return;
+        }
+
         $this->call([
             RoleSeeder::class,
         ]);
@@ -76,8 +82,13 @@ class ApplicationDemoSeeder extends Seeder
 
     protected function seedDemoSudo(): void
     {
-        $email = env('DEMO_SUDO_EMAIL', 'akinjoseph221@gmail.com');
-        $password = env('DEMO_SUDO_PASSWORD', 'password');
+        $email = env('DEMO_SUDO_EMAIL', env('SUDO_EMAIL', 'demo-sudo@supermarket.test'));
+        $password = env('DEMO_SUDO_PASSWORD', env('SUDO_PASSWORD'));
+
+        if (blank($password)) {
+            $password = 'demo-local-' . now()->format('Ymd');
+            $this->command?->warn('No DEMO_SUDO_PASSWORD set. Using a generated local password: ' . $password);
+        }
 
         /** @var User $sudo */
         $sudo = User::query()->firstOrCreate(
@@ -105,7 +116,7 @@ class ApplicationDemoSeeder extends Seeder
             ['email' => $email],
             [
                 'name' => $name,
-                'password' => Hash::make('password'),
+                'password' => Hash::make(env('DEMO_ADMIN_PASSWORD', 'local-admin-' . now()->format('Ymd'))),
                 'email_verified_at' => now(),
             ],
         );
