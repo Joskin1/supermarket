@@ -15,7 +15,7 @@ class ListSystemSettings extends ListRecords
     {
         return [
             CreateAction::make()
-                ->visible(fn (): bool => ! SystemSetting::query()->exists()),
+                ->visible(fn (): bool => ! SystemSetting::query()->currentRecord()->exists()),
         ];
     }
 }

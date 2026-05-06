@@ -22,6 +22,16 @@ class SystemSettingsTest extends TestCase
         $this->assertSame('NGN', $settings->currency_code);
     }
 
+    public function test_system_settings_current_returns_the_same_singleton_record(): void
+    {
+        $first = SystemSetting::current();
+        $second = SystemSetting::current();
+
+        $this->assertSame($first->id, $second->id);
+        $this->assertSame(SystemSetting::SINGLETON_KEY, $first->singleton_key);
+        $this->assertDatabaseCount('system_settings', 1);
+    }
+
     public function test_only_sudo_users_can_access_system_settings_pages(): void
     {
         $this->seed(RoleSeeder::class);
@@ -41,7 +51,7 @@ class SystemSettingsTest extends TestCase
             'email_verified_at' => now(),
         ]);
 
-        $setting = SystemSetting::factory()->create();
+        $setting = SystemSetting::current();
 
         $this->actingAs($sudo)->get('/admin/system-settings')->assertOk();
         $this->actingAs($sudo)->get('/admin/system-settings/'.$setting->id.'/edit')->assertOk();

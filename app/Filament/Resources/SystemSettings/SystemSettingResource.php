@@ -13,6 +13,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class SystemSettingResource extends Resource
 {
@@ -32,6 +33,12 @@ class SystemSettingResource extends Resource
     public static function table(Table $table): Table
     {
         return SystemSettingsTable::configure($table);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->where('singleton_key', SystemSetting::SINGLETON_KEY);
     }
 
     public static function getPages(): array

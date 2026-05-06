@@ -4,6 +4,7 @@ namespace App\Filament\Resources\SystemSettings\Pages;
 
 use App\Actions\Audit\RecordActivityAction;
 use App\Filament\Resources\SystemSettings\SystemSettingResource;
+use App\Models\SystemSetting;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 
@@ -13,7 +14,10 @@ class CreateSystemSetting extends CreateRecord
 
     protected function handleRecordCreation(array $data): Model
     {
-        $record = parent::handleRecordCreation($data);
+        $record = parent::handleRecordCreation([
+            ...$data,
+            'singleton_key' => SystemSetting::SINGLETON_KEY,
+        ]);
 
         app(RecordActivityAction::class)->execute(
             event: 'system_settings.created',

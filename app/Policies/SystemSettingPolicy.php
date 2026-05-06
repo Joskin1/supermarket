@@ -19,7 +19,7 @@ class SystemSettingPolicy
 
     public function create(User $user): bool
     {
-        return $user->isSudo() && ! SystemSetting::query()->exists();
+        return $user->isSudo() && ! SystemSetting::query()->currentRecord()->exists();
     }
 
     public function update(User $user, SystemSetting $systemSetting): bool
