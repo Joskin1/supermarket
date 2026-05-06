@@ -3,6 +3,7 @@
 namespace App\Filament\Pages\Reports;
 
 use App\Policies\Concerns\AuthorizesReportingAccess;
+use App\Support\Formatting\CurrencyFormatter;
 use Carbon\CarbonImmutable;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
@@ -27,7 +28,7 @@ abstract class BaseReportPage extends Page
 
     public function formatCurrency(float|int|string|null $amount): string
     {
-        return number_format((float) ($amount ?? 0), 2).' NGN';
+        return app(CurrencyFormatter::class)->format($amount);
     }
 
     public function formatNumber(float|int|string|null $value): string

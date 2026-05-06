@@ -5,6 +5,7 @@ namespace App\Filament\Resources\StockEntries\Tables;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\StockEntry;
+use App\Support\Formatting\CurrencyFormatter;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -37,11 +38,11 @@ class StockEntriesTable
                     ->sortable(),
                 TextColumn::make('unit_cost_price')
                     ->label('Unit cost')
-                    ->money('NGN')
+                    ->formatStateUsing(fn ($state): string => app(CurrencyFormatter::class)->format($state))
                     ->sortable(),
                 TextColumn::make('unit_selling_price')
                     ->label('Unit selling')
-                    ->money('NGN')
+                    ->formatStateUsing(fn ($state): string => app(CurrencyFormatter::class)->format($state))
                     ->sortable(),
                 TextColumn::make('creator.name')
                     ->label('Created by')

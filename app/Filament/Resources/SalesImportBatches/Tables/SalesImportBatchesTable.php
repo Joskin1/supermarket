@@ -4,6 +4,7 @@ namespace App\Filament\Resources\SalesImportBatches\Tables;
 
 use App\Enums\SalesImportBatchStatus;
 use App\Models\SalesImportBatch;
+use App\Support\Formatting\CurrencyFormatter;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -57,7 +58,7 @@ class SalesImportBatchesTable
                     ->sortable(),
                 TextColumn::make('total_sales_amount')
                     ->label('Sales amount')
-                    ->money('NGN')
+                    ->formatStateUsing(fn ($state): string => app(CurrencyFormatter::class)->format($state))
                     ->sortable(),
                 TextColumn::make('processed_at')
                     ->dateTime()

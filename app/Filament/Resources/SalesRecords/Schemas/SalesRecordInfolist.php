@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\SalesRecords\Schemas;
 
+use App\Support\Formatting\CurrencyFormatter;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -29,13 +30,13 @@ class SalesRecordInfolist
                             ->label('Category')
                             ->placeholder('Not available'),
                         TextEntry::make('unit_price')
-                            ->money('NGN'),
+                            ->formatStateUsing(fn ($state): string => app(CurrencyFormatter::class)->format($state)),
                         TextEntry::make('quantity_sold')
                             ->label('Quantity sold')
                             ->numeric(),
                         TextEntry::make('total_amount')
                             ->label('Total amount')
-                            ->money('NGN'),
+                            ->formatStateUsing(fn ($state): string => app(CurrencyFormatter::class)->format($state)),
                         TextEntry::make('batch.batch_code')
                             ->label('Batch code')
                             ->copyable(),

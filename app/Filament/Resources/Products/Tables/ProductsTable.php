@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Products\Tables;
 
 use App\Models\Product;
+use App\Support\Formatting\CurrencyFormatter;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -40,7 +41,7 @@ class ProductsTable
                     ->toggleable(),
                 TextColumn::make('selling_price')
                     ->label('Selling price')
-                    ->money('NGN')
+                    ->formatStateUsing(fn ($state): string => app(CurrencyFormatter::class)->format($state))
                     ->sortable(),
                 TextColumn::make('current_stock')
                     ->numeric()

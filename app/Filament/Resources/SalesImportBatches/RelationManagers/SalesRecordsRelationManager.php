@@ -4,6 +4,7 @@ namespace App\Filament\Resources\SalesImportBatches\RelationManagers;
 
 use App\Filament\Resources\SalesRecords\SalesRecordResource;
 use App\Models\SalesRecord;
+use App\Support\Formatting\CurrencyFormatter;
 use Filament\Actions\ViewAction;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
@@ -43,9 +44,9 @@ class SalesRecordsRelationManager extends RelationManager
                     ->label('Qty sold')
                     ->numeric(),
                 TextColumn::make('unit_price')
-                    ->money('NGN'),
+                    ->formatStateUsing(fn ($state): string => app(CurrencyFormatter::class)->format($state)),
                 TextColumn::make('total_amount')
-                    ->money('NGN'),
+                    ->formatStateUsing(fn ($state): string => app(CurrencyFormatter::class)->format($state)),
                 TextColumn::make('note')
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('No note'),

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\SalesImportBatches\Schemas;
 
 use App\Enums\SalesImportBatchStatus;
 use App\Models\SalesImportBatch;
+use App\Support\Formatting\CurrencyFormatter;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -65,7 +66,7 @@ class SalesImportBatchInfolist
                             ->numeric(),
                         TextEntry::make('total_sales_amount')
                             ->label('Total sales amount')
-                            ->money('NGN'),
+                            ->formatStateUsing(fn ($state): string => app(CurrencyFormatter::class)->format($state)),
                         TextEntry::make('created_at')
                             ->label('Uploaded at')
                             ->dateTime(),

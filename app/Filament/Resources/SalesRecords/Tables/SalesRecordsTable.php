@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\SalesRecords\Tables;
 
 use App\Models\SalesRecord;
+use App\Support\Formatting\CurrencyFormatter;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Columns\Summarizers\Sum;
@@ -43,7 +44,7 @@ class SalesRecordsTable
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('unit_price')
                     ->label('Unit price')
-                    ->money('NGN')
+                    ->formatStateUsing(fn ($state): string => app(CurrencyFormatter::class)->format($state))
                     ->sortable(),
                 TextColumn::make('quantity_sold')
                     ->label('Qty sold')
@@ -55,11 +56,11 @@ class SalesRecordsTable
                     ->sortable(),
                 TextColumn::make('total_amount')
                     ->label('Total')
-                    ->money('NGN')
+                    ->formatStateUsing(fn ($state): string => app(CurrencyFormatter::class)->format($state))
                     ->summarize([
                         Sum::make()
                             ->label('Visible total')
-                            ->money('NGN'),
+                            ->formatStateUsing(fn ($state): string => app(CurrencyFormatter::class)->format($state)),
                     ])
                     ->sortable(),
                 TextColumn::make('batch.batch_code')
