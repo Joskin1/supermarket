@@ -7,16 +7,20 @@ use App\Actions\Reporting\RefreshAllSummariesAction;
 use App\Enums\SalesImportBatchStatus;
 use App\Imports\SalesImportSpreadsheet;
 use App\Models\SalesImportBatch;
+use App\Models\SalesRecord;
 use App\Support\SalesImport\DailySalesTemplateColumns;
 use App\Support\SalesImport\SalesImportHeadingValidator;
 use App\Support\SalesImport\SalesImportRowProcessor;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 use Throwable;
 
 class ProcessSalesImportAction
@@ -37,6 +41,7 @@ class ProcessSalesImportAction
         try {
             $batch = DB::transaction(function () use ($batch): SalesImportBatch {
                 $this->validateHeadings($batch);
+                $this->ensureSalesDatesAreNotAlreadyImported($batch);
 
                 Excel::import(
                     new SalesImportSpreadsheet($batch, $this->rowProcessor),
@@ -102,6 +107,115 @@ class ProcessSalesImportAction
             ?->rangeToArray('A1:H1', null, true, false, false)[0] ?? [];
 
         $this->headingValidator->validate($headings);
+    }
+
+    /**
+     * @throws ValidationException
+     */
+    protected function ensureSalesDatesAreNotAlreadyImported(SalesImportBatch $batch): void
+    {
+        $salesDates = $this->extractWorkbookSalesDates($batch);
+
+        if ($salesDates->isEmpty()) {
+            return;
+        }
+
+        $conflictingRecords = SalesRecord::query()
+            ->select(['sales_date', 'batch_id'])
+            ->with('batch:id,batch_code,status')
+            ->whereIn('sales_date', $salesDates->all())
+            ->whereHas('batch', function ($query) use ($batch): void {
+                $query
+                    ->whereKeyNot($batch->id)
+                    ->whereIn('status', [
+                        SalesImportBatchStatus::PROCESSED->value,
+                        SalesImportBatchStatus::PROCESSED_WITH_FAILURES->value,
+                    ]);
+            })
+            ->get();
+
+        if ($conflictingRecords->isEmpty()) {
+            return;
+        }
+
+        $conflictingDates = $conflictingRecords
+            ->pluck('sales_date')
+            ->map(fn ($date): string => $date instanceof CarbonImmutable ? $date->toDateString() : (string) $date)
+            ->unique()
+            ->sort()
+            ->values();
+
+        $batchCodes = $conflictingRecords
+            ->pluck('batch.batch_code')
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        throw ValidationException::withMessages([
+            'file' => sprintf(
+                'Sales for %s already exist in processed batch(es) %s. This upload was blocked to prevent duplicate stock deductions and duplicate sales totals. Reverse or replace the earlier import before uploading another workbook for the same sales date.',
+                $conflictingDates->implode(', '),
+                $batchCodes->implode(', '),
+            ),
+        ]);
+    }
+
+    /**
+     * @return Collection<int, string>
+     */
+    protected function extractWorkbookSalesDates(SalesImportBatch $batch): Collection
+    {
+        $path = Storage::disk('local')->path($batch->file_path);
+        $reader = IOFactory::createReaderForFile($path);
+        $reader->setReadDataOnly(true);
+        $reader->setLoadSheetsOnly([DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET]);
+
+        $spreadsheet = $reader->load($path);
+        $sheet = $spreadsheet->getSheetByName(DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET);
+
+        if (! $sheet) {
+            return collect();
+        }
+
+        $highestRow = $sheet->getHighestDataRow();
+        $rows = $sheet->rangeToArray('A2:H'.$highestRow, null, true, false, false);
+
+        return collect($rows)
+            ->filter(fn (array $row): bool => $this->rowContainsSalesData($row))
+            ->map(fn (array $row): ?string => $this->normalizeWorkbookSalesDate($row[0] ?? null))
+            ->filter()
+            ->unique()
+            ->values();
+    }
+
+    /**
+     * @param  array<int, mixed>  $row
+     */
+    protected function rowContainsSalesData(array $row): bool
+    {
+        return filled($row[1] ?? null) // time
+            || filled($row[2] ?? null) // product_code
+            || filled($row[5] ?? null) // quantity_sold
+            || filled($row[7] ?? null); // note
+    }
+
+    protected function normalizeWorkbookSalesDate(mixed $value): ?string
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        try {
+            if (is_numeric($value)) {
+                return CarbonImmutable::instance(Date::excelToDateTimeObject((float) $value))
+                    ->toDateString();
+            }
+
+            return CarbonImmutable::parse(trim((string) $value))->toDateString();
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     protected function finalizeBatch(SalesImportBatch $batch): SalesImportBatch

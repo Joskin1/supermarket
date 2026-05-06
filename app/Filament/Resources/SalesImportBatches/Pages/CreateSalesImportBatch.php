@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\SalesImportBatches\Pages;
 
 use App\Actions\Sales\CreateSalesImportBatchAction;
-use App\Actions\Sales\ProcessSalesImportAction;
+use App\Actions\Sales\QueueSalesImportBatchAction;
 use App\Enums\SalesImportBatchStatus;
 use App\Filament\Resources\SalesImportBatches\SalesImportBatchResource;
 use App\Models\SalesImportBatch;
@@ -30,7 +30,9 @@ class CreateSalesImportBatch extends CreateRecord
             'notes' => $data['notes'] ?? null,
         ]);
 
-        return app(ProcessSalesImportAction::class)->execute($batch);
+        app(QueueSalesImportBatchAction::class)->execute($batch);
+
+        return $batch->fresh('uploader');
     }
 
     protected function getRedirectUrl(): string
@@ -47,17 +49,25 @@ class CreateSalesImportBatch extends CreateRecord
             SalesImportBatchStatus::PROCESSED => 'Sales file imported successfully.',
             SalesImportBatchStatus::PROCESSED_WITH_FAILURES => 'Sales file imported with some failed rows.',
             SalesImportBatchStatus::FAILED => 'Sales file could not be imported cleanly.',
+            SalesImportBatchStatus::PROCESSING => 'Sales file is processing.',
+            SalesImportBatchStatus::UPLOADED => 'Sales file queued for processing.',
             default => 'Sales file upload received.',
         };
 
         $notification = Notification::make()
             ->title($title)
-            ->body("Batch {$batch->batch_code}: {$batch->successful_rows} successful rows, {$batch->failed_rows} failed rows.");
+            ->body(match ($batch->status) {
+                SalesImportBatchStatus::UPLOADED => "Batch {$batch->batch_code} has been queued. Open the batch to monitor validation results and processed totals.",
+                SalesImportBatchStatus::PROCESSING => "Batch {$batch->batch_code} is processing now. Refresh the batch page shortly for the final totals.",
+                default => "Batch {$batch->batch_code}: {$batch->successful_rows} successful rows, {$batch->failed_rows} failed rows.",
+            });
 
         return match ($batch->status) {
             SalesImportBatchStatus::PROCESSED => $notification->success(),
             SalesImportBatchStatus::PROCESSED_WITH_FAILURES => $notification->warning(),
             SalesImportBatchStatus::FAILED => $notification->danger(),
+            SalesImportBatchStatus::PROCESSING => $notification->info(),
+            SalesImportBatchStatus::UPLOADED => $notification->info(),
             default => $notification->info(),
         };
     }
