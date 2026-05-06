@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Enums\SalesImportBatchStatus;
 use App\Models\SalesImportBatch;
+use App\Support\Formatting\CurrencyFormatter;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
@@ -45,7 +46,7 @@ class RecentSalesImports extends TableWidget
                     ->numeric(),
                 TextColumn::make('total_sales_amount')
                     ->label('Amount')
-                    ->money('NGN'),
+                    ->formatStateUsing(fn ($state): string => app(CurrencyFormatter::class)->format($state)),
                 TextColumn::make('uploader.name')
                     ->label('Uploaded by')
                     ->toggleable(),

@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\StockEntry;
+use App\Support\Formatting\CurrencyFormatter;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
@@ -32,10 +33,10 @@ class RecentStockEntries extends TableWidget
                     ->numeric(),
                 TextColumn::make('unit_cost_price')
                     ->label('Unit cost')
-                    ->money('NGN'),
+                    ->formatStateUsing(fn ($state): string => app(CurrencyFormatter::class)->format($state)),
                 TextColumn::make('unit_selling_price')
                     ->label('Unit selling')
-                    ->money('NGN'),
+                    ->formatStateUsing(fn ($state): string => app(CurrencyFormatter::class)->format($state)),
                 TextColumn::make('creator.name')
                     ->label('Created by')
                     ->placeholder('System'),
