@@ -10,7 +10,7 @@ class RestoreBackupSnapshotCommand extends Command
 {
     protected $signature = 'backups:restore {backup_code} {--note=} {--force}';
 
-    protected $description = 'Restore a backup snapshot and replace current business data.';
+    protected $description = 'Restore a business-data snapshot and replace the current business records only.';
 
     public function handle(RestoreBackupSnapshotAction $action): int
     {
@@ -20,12 +20,14 @@ class RestoreBackupSnapshotCommand extends Command
 
         if (! $backup) {
             $this->error('Backup not found.');
+
             return self::FAILURE;
         }
 
         if (! $this->option('force')) {
-            if (! $this->confirm('This will replace all current business data with the snapshot. Continue?')) {
+            if (! $this->confirm('This will replace the current business records in the snapshot scope only. It does not restore users, roles, sessions, jobs, or backup history. Continue?')) {
                 $this->warn('Restore cancelled.');
+
                 return self::FAILURE;
             }
         }
@@ -36,7 +38,7 @@ class RestoreBackupSnapshotCommand extends Command
             note: $this->option('note') ?: null,
         );
 
-        $this->info('Backup restored: '.$backup->backup_code);
+        $this->info('Business snapshot restored: '.$backup->backup_code);
 
         return self::SUCCESS;
     }

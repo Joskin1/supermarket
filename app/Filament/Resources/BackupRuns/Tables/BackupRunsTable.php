@@ -2,8 +2,8 @@
 
 namespace App\Filament\Resources\BackupRuns\Tables;
 
-use App\Models\BackupRun;
 use App\Actions\Maintenance\RestoreBackupSnapshotAction;
+use App\Models\BackupRun;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
@@ -59,8 +59,8 @@ class BackupRunsTable
                     ->icon('heroicon-o-arrow-path')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->modalHeading('Restore this backup?')
-                    ->modalDescription('This will replace the current business data with the snapshot contents.')
+                    ->modalHeading('Restore this business snapshot?')
+                    ->modalDescription('This replaces the current business records covered by the snapshot. It does not restore users, roles, sessions, jobs, or backup history.')
                     ->form([
                         Textarea::make('note')
                             ->label('Restore note')
@@ -78,8 +78,8 @@ class BackupRunsTable
 
                             Notification::make()
                                 ->success()
-                                ->title('Backup restored')
-                                ->body('The system data has been restored from this snapshot.')
+                                ->title('Business snapshot restored')
+                                ->body('The current business records covered by this snapshot were restored successfully.')
                                 ->send();
                         } catch (Throwable $exception) {
                             report($exception);
@@ -87,7 +87,7 @@ class BackupRunsTable
                             Notification::make()
                                 ->danger()
                                 ->title('Restore failed')
-                                ->body('The backup could not be restored. Check the logs and try again.')
+                                ->body('The business snapshot could not be restored. Check the logs and try again.')
                                 ->send();
                         }
                     })

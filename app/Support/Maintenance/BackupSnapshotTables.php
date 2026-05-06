@@ -24,4 +24,28 @@ final class BackupSnapshotTables
             'activity_logs',
         ];
     }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function restoreDeleteOrder(): array
+    {
+        return array_reverse(self::all());
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function excludedAreas(): array
+    {
+        return [
+            'users',
+            'roles_and_permissions',
+            'backup_runs',
+            'sessions',
+            'jobs',
+            'failed_jobs',
+            'cache',
+        ];
+    }
 }

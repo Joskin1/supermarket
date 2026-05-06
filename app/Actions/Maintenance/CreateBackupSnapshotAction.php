@@ -23,7 +23,7 @@ class CreateBackupSnapshotAction
         $settings = SystemSetting::current();
         $tables = BackupSnapshotTables::all();
         $businessSlug = Str::slug($settings->business_name ?: config('app.name')) ?: 'supermarket';
-        $fileName = $businessSlug.'-backup-'.$timestamp->format('Y-m-d-His').'.json';
+        $fileName = $businessSlug.'-backup-'.$timestamp->format('Y-m-d-His').'-'.Str::lower(Str::afterLast($backupCode, '-')).'.json';
         $filePath = 'backups/'.$timestamp->format('Y/m').'/'.$fileName;
 
         $backupRun = BackupRun::query()->create([
@@ -40,13 +40,16 @@ class CreateBackupSnapshotAction
         try {
             $payload = json_encode([
                 'metadata' => [
+                    'snapshot_type' => 'business_data',
                     'backup_code' => $backupCode,
                     'generated_at' => $timestamp->toIso8601String(),
                     'business_name' => $settings->business_name,
                     'business_timezone' => $settings->business_timezone,
                     'currency_code' => $settings->currency_code,
                     'app_env' => app()->environment(),
+                    'scope_note' => 'This snapshot covers business data only and does not include users, roles, sessions, jobs, or backup history.',
                     'tables' => $tables,
+                    'excluded_areas' => BackupSnapshotTables::excludedAreas(),
                 ],
                 'tables' => $this->tableSnapshots($tables),
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
@@ -70,7 +73,7 @@ class CreateBackupSnapshotAction
 
             app(RecordActivityAction::class)->execute(
                 event: 'backup.created',
-                description: 'A recovery backup snapshot was created.',
+                description: 'A business-data recovery snapshot was created.',
                 subject: $backupRun,
                 properties: [
                     'backup_code' => $backupRun->backup_code,
@@ -92,7 +95,7 @@ class CreateBackupSnapshotAction
 
             app(RecordActivityAction::class)->execute(
                 event: 'backup.failed',
-                description: 'A recovery backup snapshot failed.',
+                description: 'A business-data recovery snapshot failed.',
                 subject: $backupRun,
                 properties: [
                     'backup_code' => $backupRun->backup_code,
@@ -118,7 +121,7 @@ class CreateBackupSnapshotAction
      * @return array<string, Collection<int, array<string, mixed>>>
      */
     /**
-     * @param array<int, string> $tables
+     * @param  array<int, string>  $tables
      * @return array<string, Collection<int, array<string, mixed>>>
      */
     protected function tableSnapshots(array $tables): array

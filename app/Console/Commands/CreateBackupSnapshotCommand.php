@@ -9,7 +9,7 @@ class CreateBackupSnapshotCommand extends Command
 {
     protected $signature = 'backups:create {--note=}';
 
-    protected $description = 'Create a private JSON recovery backup snapshot of the business data.';
+    protected $description = 'Create a private JSON snapshot of the business data needed for recovery planning.';
 
     public function handle(CreateBackupSnapshotAction $action): int
     {
