@@ -20,7 +20,11 @@ class SalesEntryLogSheetImport implements OnEachRow, WithChunkReading, WithHeadi
 
     public function onRow(Row $row): void
     {
-        if ($row->isEmpty(false, 'H')) {
+        if ($row->isEmpty(false, 'I')) {
+            return;
+        }
+
+        if (! $this->rowHasEditableInput($row)) {
             return;
         }
 
@@ -31,6 +35,23 @@ class SalesEntryLogSheetImport implements OnEachRow, WithChunkReading, WithHeadi
         }
 
         $this->rowProcessor->process($this->batch, $rowData, $row->getIndex());
+    }
+
+    protected function rowHasEditableInput(Row $row): bool
+    {
+        $spreadsheetRow = $row->getDelegate();
+        $worksheet = $spreadsheetRow->getWorksheet();
+        $rowNumber = $spreadsheetRow->getRowIndex();
+
+        foreach (['C', 'G', 'I'] as $column) {
+            if (filled($worksheet->getCell("{$column}{$rowNumber}")->getValue())) {
+                return true;
+            }
+        }
+
+        $skuCell = $worksheet->getCell("D{$rowNumber}");
+
+        return (! $skuCell->isFormula()) && filled($skuCell->getValue());
     }
 
     public function chunkSize(): int
@@ -59,14 +80,15 @@ class SalesEntryLogSheetImport implements OnEachRow, WithChunkReading, WithHeadi
     protected function extractRowData(Row $row): array
     {
         /** @var array<string, mixed> $rowData */
-        $rowData = $row->toArray(null, false, true, 'H');
+        $rowData = $row->toArray(null, false, true, 'I');
         $spreadsheetRow = $row->getDelegate();
         $rowNumber = $spreadsheetRow->getRowIndex();
 
         foreach ([
-            'D' => 'product_name',
-            'E' => 'unit_price',
-            'G' => 'total_amount',
+            'D' => 'sku',
+            'E' => 'product_name',
+            'F' => 'unit_price',
+            'H' => 'total_amount',
         ] as $column => $key) {
             $cell = $spreadsheetRow->getWorksheet()->getCell("{$column}{$rowNumber}");
             $rowData[$key] = $this->resolveCellValue(
@@ -95,20 +117,37 @@ class SalesEntryLogSheetImport implements OnEachRow, WithChunkReading, WithHeadi
             return $fallback;
         }
 
-        if (in_array($field, ['product_name', 'unit_price'], true) && blank($rowData['product_code'] ?? null)) {
+        if (
+            in_array($field, ['sku', 'product_name', 'unit_price'], true)
+            && blank($rowData['barcode'] ?? null)
+            && blank($rowData['sku'] ?? null)
+        ) {
             return null;
         }
 
         if (
             $field === 'total_amount'
             && (
-                blank($rowData['product_code'] ?? null)
+                (blank($rowData['barcode'] ?? null) && blank($rowData['sku'] ?? null))
                 || blank($rowData['quantity_sold'] ?? null)
             )
         ) {
             return null;
         }
 
-        return $cell->getOldCalculatedValue();
+        $calculatedValue = $cell->getOldCalculatedValue();
+
+        if (
+            in_array($field, ['sku', 'product_name', 'unit_price', 'total_amount'], true)
+            && (
+                $calculatedValue === 0
+                || $calculatedValue === '0'
+                || (is_string($calculatedValue) && str_starts_with($calculatedValue, '#'))
+            )
+        ) {
+            return null;
+        }
+
+        return $calculatedValue;
     }
 }

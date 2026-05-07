@@ -85,7 +85,7 @@ class ProcessSalesImportAction
         ] as $sheetName) {
             if (! in_array($sheetName, $worksheetNames, true)) {
                 throw ValidationException::withMessages([
-                    'file' => 'The uploaded workbook must include both the "Product Reference" and "Sales Entry Log" sheets.',
+                    'file' => 'The uploaded workbook must include both the "Product Reference" and "Daily Sales Entry" sheets.',
                 ]);
             }
         }
@@ -96,7 +96,7 @@ class ProcessSalesImportAction
         {
             public function readCell($columnAddress, $row, $worksheetName = ''): bool
             {
-                return $row === 1 && in_array($columnAddress, range('A', 'H'), true);
+                return $row === 1 && in_array($columnAddress, range('A', 'I'), true);
             }
         });
 
@@ -104,7 +104,7 @@ class ProcessSalesImportAction
 
         $headings = $spreadsheet
             ->getSheetByName(DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET)
-            ?->rangeToArray('A1:H1', null, true, false, false)[0] ?? [];
+            ?->rangeToArray('A1:I1', null, true, false, false)[0] ?? [];
 
         $this->headingValidator->validate($headings);
     }
@@ -179,7 +179,7 @@ class ProcessSalesImportAction
         }
 
         $highestRow = $sheet->getHighestDataRow();
-        $rows = $sheet->rangeToArray('A2:H'.$highestRow, null, true, false, false);
+        $rows = $sheet->rangeToArray('A2:I'.$highestRow, null, true, false, false);
 
         return collect($rows)
             ->filter(fn (array $row): bool => $this->rowContainsSalesData($row))
@@ -195,9 +195,10 @@ class ProcessSalesImportAction
     protected function rowContainsSalesData(array $row): bool
     {
         return filled($row[1] ?? null) // time
-            || filled($row[2] ?? null) // product_code
-            || filled($row[5] ?? null) // quantity_sold
-            || filled($row[7] ?? null); // note
+            || filled($row[2] ?? null) // barcode
+            || filled($row[3] ?? null) // sku
+            || filled($row[6] ?? null) // quantity_sold
+            || filled($row[8] ?? null); // note
     }
 
     protected function normalizeWorkbookSalesDate(mixed $value): ?string

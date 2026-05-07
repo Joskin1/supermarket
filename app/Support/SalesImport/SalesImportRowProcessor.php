@@ -50,7 +50,9 @@ class SalesImportRowProcessor
                 static fn (mixed $message): string => (string) $message,
                 $messages,
             )),
-            'product_code' => filled($row['product_code'] ?? null) ? strtoupper(trim((string) $row['product_code'])) : null,
+            'product_code' => filled($row['sku'] ?? $row['product_code'] ?? null)
+                ? strtoupper(trim((string) ($row['sku'] ?? $row['product_code'])))
+                : (filled($row['barcode'] ?? null) ? trim((string) $row['barcode']) : null),
             'product_name' => filled($row['product_name'] ?? null) ? trim((string) $row['product_name']) : null,
             'sales_date' => $this->parseDateSafely($row['date'] ?? null),
         ]);

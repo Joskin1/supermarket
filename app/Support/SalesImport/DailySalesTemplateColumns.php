@@ -6,7 +6,7 @@ class DailySalesTemplateColumns
 {
     public const PRODUCT_REFERENCE_SHEET = 'Product Reference';
 
-    public const SALES_ENTRY_LOG_SHEET = 'Sales Entry Log';
+    public const SALES_ENTRY_LOG_SHEET = 'Daily Sales Entry';
 
     public const ENTRY_TEMPLATE_ROWS = 1000;
 
@@ -16,7 +16,8 @@ class DailySalesTemplateColumns
     public static function productReference(): array
     {
         return [
-            'product_code',
+            'barcode',
+            'sku',
             'category',
             'product_name',
             'unit_price',
@@ -31,7 +32,8 @@ class DailySalesTemplateColumns
         return [
             'date',
             'time',
-            'product_code',
+            'barcode',
+            'sku',
             'product_name',
             'unit_price',
             'quantity_sold',

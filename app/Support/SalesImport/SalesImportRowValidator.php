@@ -22,7 +22,8 @@ class SalesImportRowValidator
         $normalized = [
             'date' => $this->normalizeDate($row['date'] ?? null),
             'time' => $this->normalizeTime($row['time'] ?? null),
-            'product_code' => Str::upper((string) $this->normalizeString($row['product_code'] ?? null)),
+            'barcode' => $this->normalizeString($row['barcode'] ?? null),
+            'sku' => Str::upper((string) $this->normalizeString($row['sku'] ?? $row['product_code'] ?? null)),
             'product_name' => $this->normalizeString($row['product_name'] ?? null),
             'unit_price' => $this->normalizeNumeric($row['unit_price'] ?? null),
             'quantity_sold' => $this->normalizeInteger($row['quantity_sold'] ?? null),
@@ -33,34 +34,52 @@ class SalesImportRowValidator
         $data = Validator::make($normalized, [
             'date' => ['bail', 'required', 'date'],
             'time' => ['nullable', 'date_format:H:i:s'],
-            'product_code' => ['bail', 'required', 'string', 'max:255'],
+            'barcode' => ['nullable', 'string', 'max:255'],
+            'sku' => ['nullable', 'string', 'max:255'],
             'product_name' => ['nullable', 'string', 'max:255'],
-            'unit_price' => ['bail', 'required', 'numeric', 'min:0'],
+            'unit_price' => ['nullable', 'numeric', 'min:0'],
             'quantity_sold' => ['bail', 'required', 'integer', 'min:1'],
             'note' => ['nullable', 'string', 'max:1000'],
-        ])->validate();
+        ])->after(function ($validator) use ($normalized): void {
+            if (blank($normalized['barcode']) && blank($normalized['sku'])) {
+                $validator->errors()->add('barcode', 'The barcode field is required when no SKU is provided.');
+            }
+        })->validate();
 
         /** @var Product|null $product */
         $product = Product::query()
             ->with('category:id,name')
-            ->where('sku', $data['product_code'])
+            ->when(
+                filled($data['barcode'] ?? null),
+                fn ($query) => $query->where('barcode', $data['barcode']),
+                fn ($query) => $query->where('sku', $data['sku']),
+            )
             ->first();
 
         if (! $product) {
             throw ValidationException::withMessages([
-                'product_code' => 'The product code does not match any existing product.',
+                'barcode' => 'The barcode/SKU does not match any existing product.',
             ]);
         }
+
+        $unitPrice = round(
+            (float) (filled($data['unit_price'] ?? null) && (float) $data['unit_price'] > 0
+                ? $data['unit_price']
+                : $product->selling_price),
+            2,
+        );
 
         return [
             'sales_date' => CarbonImmutable::parse($data['date'])->toDateString(),
             'sales_time' => $data['time'] ?? null,
             'product' => $product,
-            'product_code' => $data['product_code'],
-            'product_name' => $data['product_name'],
-            'unit_price' => round((float) $data['unit_price'], 2),
+            'barcode' => $data['barcode'] ?? null,
+            'product_code' => $product->sku,
+            'sku' => $product->sku,
+            'product_name' => filled($data['product_name'] ?? null) ? $data['product_name'] : $product->name,
+            'unit_price' => $unitPrice,
             'quantity_sold' => (int) $data['quantity_sold'],
-            'total_amount' => round((float) $data['unit_price'] * (int) $data['quantity_sold'], 2),
+            'total_amount' => round($unitPrice * (int) $data['quantity_sold'], 2),
             'note' => $data['note'] ?? null,
         ];
     }

@@ -25,7 +25,8 @@ class ProductReferenceSheetExport implements FromCollection, ShouldAutoSize, Wit
             ->orderBy('name')
             ->get()
             ->map(fn (Product $product): array => [
-                'product_code' => $product->sku,
+                'barcode' => $product->barcode,
+                'sku' => $product->sku,
                 'category' => $product->category?->name,
                 'product_name' => $product->name,
                 'unit_price' => $product->selling_price,
@@ -63,7 +64,7 @@ class ProductReferenceSheetExport implements FromCollection, ShouldAutoSize, Wit
                 $highestRow = max($sheet->getHighestDataRow(), 1);
 
                 $sheet->freezePane('A2');
-                $sheet->setAutoFilter("A1:D{$highestRow}");
+                $sheet->setAutoFilter("A1:E{$highestRow}");
                 $sheet->getProtection()->setSheet(true);
             },
         ];
