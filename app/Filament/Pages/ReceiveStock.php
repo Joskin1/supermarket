@@ -12,6 +12,7 @@ use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -175,7 +176,7 @@ class ReceiveStock extends Page
     {
         $this->validate([
             'newProductName' => ['required', 'string', 'max:255'],
-            'newProductSku' => ['required', 'string', 'max:255'],
+            'newProductSku' => ['required', 'string', 'max:255', 'unique:products,sku'],
             'newProductCategoryId' => ['required', 'integer', 'exists:categories,id'],
             'newProductPurchasePrice' => ['required', 'numeric', 'min:0'],
             'newProductSellingPrice' => ['required', 'numeric', 'min:0'],
@@ -185,36 +186,49 @@ class ReceiveStock extends Page
             'stockDate' => ['required', 'date'],
         ]);
 
-        try {
-            $product = Product::query()->create([
-                'category_id' => $this->newProductCategoryId,
-                'name' => $this->newProductName,
-                'sku' => strtoupper(trim($this->newProductSku)),
-                'barcode' => $this->barcode,
-                'brand' => $this->newProductBrand ?: null,
-                'purchase_price' => $this->newProductPurchasePrice,
-                'selling_price' => $this->newProductSellingPrice,
-                'unit_of_measure' => $this->newProductUnitOfMeasure ?: 'pcs',
-                'reorder_level' => 0,
-            ]);
-
-            $stockEntry = app(CreateStockEntryAction::class)->execute([
-                'product_id' => $product->id,
-                'quantity_added' => (int) $this->quantityAdded,
-                'unit_cost_price' => $this->unitCostPrice,
-                'unit_selling_price' => $this->unitSellingPrice,
-                'stock_date' => $this->stockDate,
-                'reference' => $this->reference ?: null,
-                'note' => $this->note ?: null,
-                'created_by' => auth()->id(),
-                'update_product_prices' => true,
-            ]);
-
+        // Validate barcode uniqueness separately since it comes from scan state.
+        if (Product::query()->where('barcode', $this->barcode)->exists()) {
             Notification::make()
-                ->title('Product created & stock added')
-                ->body("Created {$product->name} with {$stockEntry->quantity_added} units.")
-                ->success()
+                ->title('Duplicate barcode')
+                ->body('A product with this barcode already exists. Scan it again to add stock instead.')
+                ->danger()
                 ->send();
+
+            return;
+        }
+
+        try {
+            DB::transaction(function (): void {
+                $product = Product::query()->create([
+                    'category_id' => $this->newProductCategoryId,
+                    'name' => $this->newProductName,
+                    'sku' => strtoupper(trim($this->newProductSku)),
+                    'barcode' => $this->barcode,
+                    'brand' => $this->newProductBrand ?: null,
+                    'purchase_price' => $this->newProductPurchasePrice,
+                    'selling_price' => $this->newProductSellingPrice,
+                    'unit_of_measure' => $this->newProductUnitOfMeasure ?: 'pcs',
+                    'reorder_level' => 0,
+                ]);
+
+                $stockEntry = app(CreateStockEntryAction::class)->execute([
+                    'product_id' => $product->id,
+                    'quantity_added' => (int) $this->quantityAdded,
+                    'unit_cost_price' => $this->unitCostPrice,
+                    'unit_selling_price' => $this->unitSellingPrice,
+                    'stock_date' => $this->stockDate,
+                    'reference' => $this->reference ?: null,
+                    'note' => $this->note ?: null,
+                    'created_by' => auth()->id(),
+                    'update_product_prices' => true,
+                ]);
+
+                Notification::make()
+                    ->title('Product created & stock added')
+                    ->body("Created {$product->name} with {$stockEntry->quantity_added} units.")
+                    ->success()
+                    ->send();
+            });
 
             $this->resetScanState();
         } catch (ValidationException $e) {
