@@ -33,12 +33,14 @@ class ListSalesRecords extends ListRecords
                         ->label('Product')
                         ->getSearchResultsUsing(fn (string $search): array => Product::query()
                             ->where(function (Builder $query) use ($search): void {
+                                $escaped = str_replace(['%', '_'], ['\%', '\_'], $search);
+
                                 $query
-                                    ->where('name', 'like', "%{$search}%")
-                                    ->orWhere('barcode', 'like', "%{$search}%")
-                                    ->orWhere('sku', 'like', "%{$search}%")
-                                    ->orWhere('brand', 'like', "%{$search}%")
-                                    ->orWhere('product_group', 'like', "%{$search}%");
+                                    ->where('name', 'like', "%{$escaped}%")
+                                    ->orWhere('barcode', 'like', "%{$escaped}%")
+                                    ->orWhere('sku', 'like', "%{$escaped}%")
+                                    ->orWhere('brand', 'like', "%{$escaped}%")
+                                    ->orWhere('product_group', 'like', "%{$escaped}%");
                             })
                             ->orderBy('name')
                             ->limit(50)
