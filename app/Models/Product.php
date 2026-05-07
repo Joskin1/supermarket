@@ -18,6 +18,7 @@ use Illuminate\Support\Str;
     'name',
     'slug',
     'sku',
+    'barcode',
     'brand',
     'variant',
     'description',
@@ -88,6 +89,16 @@ class Product extends Model
     public function scopeOutOfStock(Builder $query): Builder
     {
         return $query->where('current_stock', 0);
+    }
+
+    public function scopeByBarcode(Builder $query, string $barcode): Builder
+    {
+        return $query->where('barcode', $barcode);
+    }
+
+    public function scopeMatchingBarcodeOrSku(Builder $query, string $code): Builder
+    {
+        return $query->where('barcode', $code)->orWhere('sku', $code);
     }
 
     public function isLowStock(): bool
