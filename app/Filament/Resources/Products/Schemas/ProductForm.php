@@ -76,6 +76,12 @@ class ProductForm
                         ->maxLength(255)
                         ->unique(ignoreRecord: true)
                         ->dehydrateStateUsing(static fn (?string $state): ?string => filled($state) ? Str::upper(trim($state)) : null),
+                    TextInput::make('barcode')
+                        ->label('Barcode')
+                        ->maxLength(255)
+                        ->unique(ignoreRecord: true)
+                        ->dehydrateStateUsing(static fn (?string $state): ?string => filled($state) ? trim($state) : null)
+                        ->helperText('Scan or enter a UPC, EAN, GTIN, or Code128-compatible value.'),
                     TextInput::make('brand')
                         ->maxLength(255),
                     TextInput::make('variant')

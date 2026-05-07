@@ -39,6 +39,7 @@ class ProductFactory extends Factory
             'name' => $name,
             'slug' => Str::slug(trim($name.' '.$variant)),
             'sku' => Str::upper(fake()->unique()->bothify('SKU-??-####')),
+            'barcode' => fake()->unique()->numerify('#############'),
             'brand' => $catalogEntry['brand'],
             'variant' => $variant,
             'description' => fake()->sentence(),

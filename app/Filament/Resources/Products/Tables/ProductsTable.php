@@ -32,6 +32,12 @@ class ProductsTable
                 TextColumn::make('sku')
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('barcode')
+                    ->label('Barcode')
+                    ->searchable()
+                    ->copyable()
+                    ->placeholder('No barcode')
+                    ->toggleable(),
                 TextColumn::make('category.name')
                     ->label('Category')
                     ->sortable(),

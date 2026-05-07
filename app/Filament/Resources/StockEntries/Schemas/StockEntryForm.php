@@ -31,14 +31,14 @@ class StockEntryForm
                                     ->orderBy('name'),
                             )
                             ->getOptionLabelFromRecordUsing(
-                                fn (Product $record): string => trim($record->name.' ('.$record->sku.')')
+                                fn (Product $record): string => trim($record->name.' ('.collect([$record->barcode, $record->sku])->filter()->implode(' / ').')')
                             )
-                            ->searchable(['name', 'sku', 'brand', 'product_group'])
+                            ->searchable(['name', 'barcode', 'sku', 'brand', 'product_group'])
                             ->searchDebounce(300)
                             ->optionsLimit(50)
                             ->createOptionForm(ProductForm::inlineCreateComponents())
                             ->required()
-                            ->helperText('Search for an existing product first. Create a new one here only if it does not exist.'),
+                            ->helperText('Scan a barcode or search by product name/SKU. Create a new product here only if it does not exist.'),
                     ]),
                 Section::make('Stock entry details')
                     ->schema([
