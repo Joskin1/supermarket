@@ -6,10 +6,15 @@ use App\Models\Product;
 use App\Models\SalesImportBatch;
 use App\Models\SalesRecord;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class ApplySalesRecordToInventoryAction
 {
+    /**
+     * @var array<int, string>|null
+     */
+    protected ?array $salesRecordColumns = null;
 
     /**
      * @param  array<string, mixed>  $data
@@ -34,9 +39,9 @@ class ApplySalesRecordToInventoryAction
                 ]);
             }
 
-            $salesRecord = $batch->salesRecords()->create(
+            $salesRecord = $batch->salesRecords()->create($this->filterSalesRecordAttributes(
                 $this->buildSalesRecordAttributes($batch, $lockedProduct, $data),
-            );
+            ));
 
             $this->afterSalesRecordCreated($salesRecord, $lockedProduct, $data);
 
@@ -75,5 +80,16 @@ class ApplySalesRecordToInventoryAction
             'note' => $data['note'] ?? null,
             'created_by' => $batch->uploaded_by,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    protected function filterSalesRecordAttributes(array $attributes): array
+    {
+        $this->salesRecordColumns ??= Schema::getColumnListing('sales_records');
+
+        return array_intersect_key($attributes, array_flip($this->salesRecordColumns));
     }
 }
