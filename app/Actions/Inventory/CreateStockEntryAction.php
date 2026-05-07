@@ -25,7 +25,7 @@ class CreateStockEntryAction
             'unit_selling_price' => ['required', 'numeric', 'min:0'],
             'stock_date' => ['required', 'date'],
             'reference' => ['nullable', 'string', 'max:255'],
-            'note' => ['nullable', 'string'],
+            'note' => ['nullable', 'string', 'max:5000'],
             'created_by' => ['nullable', 'integer', 'exists:users,id'],
             'update_product_prices' => ['sometimes', 'boolean'],
         ])->validate();
