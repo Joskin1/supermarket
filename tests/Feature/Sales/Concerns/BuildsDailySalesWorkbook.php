@@ -86,6 +86,7 @@ trait BuildsDailySalesWorkbook
     protected function saveSpreadsheetToBinary(Spreadsheet $spreadsheet): string
     {
         $writer = new Xlsx($spreadsheet);
+        $writer->setPreCalculateFormulas(false);
 
         ob_start();
         $writer->save('php://output');
@@ -100,7 +101,8 @@ trait BuildsDailySalesWorkbook
     protected function referenceRowForProduct(Product $product): array
     {
         return [
-            'product_code' => $product->sku,
+            'barcode' => $product->barcode,
+            'sku' => $product->sku,
             'category' => $product->category?->name,
             'product_name' => $product->name,
             'unit_price' => $product->selling_price,
@@ -113,10 +115,18 @@ trait BuildsDailySalesWorkbook
      */
     protected function salesEntryRow(array $overrides = []): array
     {
+        if (array_key_exists('product_code', $overrides)) {
+            $overrides['sku'] ??= $overrides['product_code'];
+            $overrides['barcode'] ??= null;
+
+            unset($overrides['product_code']);
+        }
+
         $row = array_merge([
             'date' => now()->toDateString(),
             'time' => '09:30',
-            'product_code' => 'SKU-001',
+            'barcode' => '012345678905',
+            'sku' => 'SKU-001',
             'product_name' => 'Coca-Cola Classic Soft Drink',
             'unit_price' => 500,
             'quantity_sold' => 1,

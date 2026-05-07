@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Style\Protection;
 use RuntimeException;
 use Tests\Feature\Sales\Concerns\BuildsDailySalesWorkbook;
 use Tests\TestCase;
@@ -42,6 +43,7 @@ class SalesWorkflowTest extends TestCase
     {
         Product::factory()->create([
             'sku' => 'SKU-ACTIVE-1001',
+            'barcode' => '012345678901',
             'name' => 'Active Product',
             'is_active' => true,
         ]);
@@ -60,12 +62,12 @@ class SalesWorkflowTest extends TestCase
         $this->assertSame(
             DailySalesTemplateColumns::productReference(),
             $spreadsheet->getSheetByName(DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET)
-                ?->rangeToArray('A1:D1', null, false, false, false)[0],
+                ?->rangeToArray('A1:E1', null, false, false, false)[0],
         );
         $this->assertSame(
             DailySalesTemplateColumns::salesEntryLog(),
             $spreadsheet->getSheetByName(DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET)
-                ?->rangeToArray('A1:H1', null, false, false, false)[0],
+                ?->rangeToArray('A1:I1', null, false, false, false)[0],
         );
     }
 
@@ -74,6 +76,7 @@ class SalesWorkflowTest extends TestCase
         $salesDate = CarbonImmutable::parse('2026-04-10');
         $activeProduct = Product::factory()->create([
             'sku' => 'SKU-ACTIVE-1001',
+            'barcode' => '012345678901',
             'name' => 'Active Product',
             'selling_price' => 2500,
             'is_active' => true,
@@ -91,19 +94,21 @@ class SalesWorkflowTest extends TestCase
 
         $spreadsheet = $this->loadSpreadsheetFromBinary($binary);
         $rows = $spreadsheet->getSheetByName(DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET)
-            ?->rangeToArray('A2:D10', null, false, false, false);
+            ?->rangeToArray('A2:E10', null, false, false, false);
 
         $rows = array_values(array_filter($rows ?? [], static fn (array $row): bool => filled($row[0] ?? null)));
 
         $this->assertCount(1, $rows);
-        $this->assertSame($activeProduct->sku, $rows[0][0]);
-        $this->assertSame($activeProduct->name, $rows[0][2]);
+        $this->assertSame($activeProduct->barcode, $rows[0][0]);
+        $this->assertSame($activeProduct->sku, $rows[0][1]);
+        $this->assertSame($activeProduct->name, $rows[0][3]);
     }
 
     public function test_sales_entry_sheet_keeps_the_time_column_manual_and_uses_the_expected_formulas(): void
     {
         Product::factory()->create([
             'sku' => 'SKU-ACTIVE-1001',
+            'barcode' => '012345678901',
             'name' => 'Active Product',
             'selling_price' => 2500,
             'is_active' => true,
@@ -121,8 +126,19 @@ class SalesWorkflowTest extends TestCase
         $this->assertSame('time', $sheet?->getCell('B1')->getValue());
         $this->assertNull($sheet?->getCell('B2')->getValue());
         $this->assertStringStartsWith('=IF($C2=', (string) $sheet?->getCell('D2')->getValue());
-        $this->assertStringStartsWith('=IF($C2=', (string) $sheet?->getCell('E2')->getValue());
-        $this->assertStringStartsWith('=IF(OR($E2=', (string) $sheet?->getCell('G2')->getValue());
+        $this->assertStringStartsWith('=IF($C2<>', (string) $sheet?->getCell('E2')->getValue());
+        $this->assertStringContainsString('MATCH($D2', (string) $sheet?->getCell('E2')->getValue());
+        $this->assertStringStartsWith('=IF($C2<>', (string) $sheet?->getCell('F2')->getValue());
+        $this->assertStringContainsString('MATCH($D2', (string) $sheet?->getCell('F2')->getValue());
+        $this->assertStringStartsWith('=IF(OR($F2=', (string) $sheet?->getCell('H2')->getValue());
+        $this->assertTrue($sheet?->getProtection()->getSheet());
+        $this->assertSame(Protection::PROTECTION_UNPROTECTED, $sheet?->getStyle('C2')->getProtection()->getLocked());
+        $this->assertSame(Protection::PROTECTION_UNPROTECTED, $sheet?->getStyle('D2')->getProtection()->getLocked());
+        $this->assertSame(Protection::PROTECTION_UNPROTECTED, $sheet?->getStyle('G2')->getProtection()->getLocked());
+        $this->assertSame(Protection::PROTECTION_UNPROTECTED, $sheet?->getStyle('I2')->getProtection()->getLocked());
+        $this->assertSame(Protection::PROTECTION_PROTECTED, $sheet?->getStyle('E2')->getProtection()->getLocked());
+        $this->assertSame(Protection::PROTECTION_PROTECTED, $sheet?->getStyle('F2')->getProtection()->getLocked());
+        $this->assertSame(Protection::PROTECTION_PROTECTED, $sheet?->getStyle('H2')->getProtection()->getLocked());
         $this->assertStringContainsString('Ctrl+Shift+:', (string) $sheet?->getCell('J2')->getValue());
     }
 
@@ -193,8 +209,8 @@ class SalesWorkflowTest extends TestCase
         $spreadsheet = $this->loadSpreadsheetFromBinary($binary);
         $sheet = $spreadsheet->getSheetByName(DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET);
         $sheet?->setCellValue('B2', '10:45');
-        $sheet?->setCellValue('C2', $product->sku);
-        $sheet?->setCellValue('F2', 2);
+        $sheet?->setCellValue('C2', $product->barcode);
+        $sheet?->setCellValue('G2', 2);
 
         $upload = UploadedFile::fake()->createWithContent(
             'daily-sales-template.xlsx',
@@ -222,6 +238,50 @@ class SalesWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_exported_template_can_be_uploaded_with_manual_sku_when_barcode_is_missing(): void
+    {
+        $uploader = User::factory()->create();
+        $product = Product::factory()->create([
+            'sku' => 'SKU-MANUAL-1001',
+            'selling_price' => 1900,
+            'current_stock' => 6,
+            'is_active' => true,
+        ]);
+
+        $binary = Excel::raw(
+            new DailySalesTemplateExport(CarbonImmutable::parse('2026-04-10')),
+            \Maatwebsite\Excel\Excel::XLSX,
+        );
+
+        $spreadsheet = $this->loadSpreadsheetFromBinary($binary);
+        $sheet = $spreadsheet->getSheetByName(DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET);
+        $sheet?->setCellValue('D2', $product->sku);
+        $sheet?->setCellValue('G2', 2);
+
+        $upload = UploadedFile::fake()->createWithContent(
+            'daily-sales-template.xlsx',
+            $this->saveSpreadsheetToBinary($spreadsheet),
+        );
+
+        $batch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $upload,
+            'uploaded_by' => $uploader->id,
+        ]);
+
+        $processedBatch = app(ProcessSalesImportAction::class)->execute($batch);
+
+        $this->assertSame(SalesImportBatchStatus::PROCESSED, $processedBatch->status);
+        $this->assertSame(1, $processedBatch->successful_rows);
+        $this->assertSame(4, $product->fresh()->current_stock);
+        $this->assertDatabaseHas('sales_records', [
+            'batch_id' => $batch->id,
+            'product_id' => $product->id,
+            'quantity_sold' => 2,
+            'unit_price' => 1900,
+            'total_amount' => 3800,
+        ]);
+    }
+
     public function test_exported_template_skips_untouched_rows_even_when_excel_caches_formula_values(): void
     {
         $uploader = User::factory()->create();
@@ -240,10 +300,10 @@ class SalesWorkflowTest extends TestCase
         $spreadsheet = $this->loadSpreadsheetFromBinary($binary);
         $sheet = $spreadsheet->getSheetByName(DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET);
         $sheet?->setCellValue('B2', '10:45');
-        $sheet?->setCellValue('C2', $product->sku);
-        $sheet?->setCellValue('F2', 2);
+        $sheet?->setCellValue('C2', $product->barcode);
+        $sheet?->setCellValue('G2', 2);
 
-        foreach (['D3', 'E3', 'G3'] as $coordinate) {
+        foreach (['D3', 'E3', 'F3', 'H3'] as $coordinate) {
             $sheet?->getCell($coordinate)->setCalculatedValue(0);
         }
 
@@ -468,7 +528,7 @@ class SalesWorkflowTest extends TestCase
         $spreadsheet = $this->loadSpreadsheetFromBinary($binary);
         $sheet = $spreadsheet->getSheetByName(DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET);
 
-        foreach (['D2', 'E2', 'G2'] as $coordinate) {
+        foreach (['D2', 'E2', 'F2', 'H2'] as $coordinate) {
             $sheet?->getCell($coordinate)->setCalculatedValue(0);
         }
 

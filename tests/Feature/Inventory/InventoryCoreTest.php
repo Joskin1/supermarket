@@ -4,12 +4,15 @@ namespace Tests\Feature\Inventory;
 
 use App\Actions\Inventory\CreateStockAdjustmentAction;
 use App\Actions\Inventory\CreateStockEntryAction;
+use App\Models\BarcodeLookupCache;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\StockAdjustment;
 use App\Models\StockEntry;
+use App\Services\BarcodeProductLookupService;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Tests\TestCase;
@@ -42,6 +45,7 @@ class InventoryCoreTest extends TestCase
             'product_group' => 'Perfume',
             'name' => 'Zara Gold Perfume',
             'sku' => 'COS-PERF-ZARA-50',
+            'barcode' => '012345678905',
             'brand' => 'Zara',
             'variant' => '50ml',
             'purchase_price' => 18500,
@@ -67,6 +71,7 @@ class InventoryCoreTest extends TestCase
             'product_group' => 'Perfume',
             'name' => 'Zara Gold Perfume',
             'sku' => 'COS-PERF-ZARA-50',
+            'barcode' => '012345678905',
             'purchase_price' => 18500,
             'selling_price' => 22500,
             'reorder_level' => 4,
@@ -81,12 +86,97 @@ class InventoryCoreTest extends TestCase
             'product_group' => 'Perfume',
             'name' => 'Zara Gold Perfume Restock',
             'sku' => 'COS-PERF-ZARA-50',
+            'barcode' => '012345678906',
             'purchase_price' => 19000,
             'selling_price' => 23000,
             'reorder_level' => 4,
             'unit_of_measure' => 'bottle',
             'is_active' => true,
         ]);
+    }
+
+    public function test_duplicate_barcode_is_rejected(): void
+    {
+        $category = $this->createCategory();
+
+        Product::query()->create([
+            'category_id' => $category->id,
+            'product_group' => 'Perfume',
+            'name' => 'Zara Gold Perfume',
+            'sku' => 'COS-PERF-ZARA-50',
+            'barcode' => '012345678905',
+            'purchase_price' => 18500,
+            'selling_price' => 22500,
+            'reorder_level' => 4,
+            'unit_of_measure' => 'bottle',
+            'is_active' => true,
+        ]);
+
+        $this->expectException(QueryException::class);
+
+        Product::query()->create([
+            'category_id' => $category->id,
+            'product_group' => 'Perfume',
+            'name' => 'Zara Gold Perfume Restock',
+            'sku' => 'COS-PERF-ZARA-60',
+            'barcode' => '012345678905',
+            'purchase_price' => 19000,
+            'selling_price' => 23000,
+            'reorder_level' => 4,
+            'unit_of_measure' => 'bottle',
+            'is_active' => true,
+        ]);
+    }
+
+    public function test_barcode_lookup_uses_local_product_before_external_apis(): void
+    {
+        Http::fake();
+
+        $product = $this->createProduct([
+            'barcode' => '012345678905',
+            'sku' => 'COS-PERF-ZARA-50',
+        ]);
+
+        $result = app(BarcodeProductLookupService::class)->find('012345678905');
+
+        $this->assertSame('local', $result['source']);
+        $this->assertSame($product->id, $result['product_id']);
+        $this->assertSame($product->sku, $result['sku']);
+        Http::assertNothingSent();
+    }
+
+    public function test_external_barcode_lookup_is_cached_locally(): void
+    {
+        Http::fake([
+            'world.openfoodfacts.org/*' => Http::response([
+                'status' => 1,
+                'product' => [
+                    'product_name' => 'Imported Cereal',
+                    'brands' => 'Breakfast Co',
+                    'categories' => 'Cereals',
+                ],
+            ]),
+        ]);
+
+        $result = app(BarcodeProductLookupService::class)->find('0099999999999');
+
+        $this->assertSame('external', $result['source']);
+        $this->assertSame('open_food_facts', $result['provider']);
+        $this->assertSame('Imported Cereal', $result['product_name']);
+
+        $this->assertDatabaseHas('barcode_lookup_caches', [
+            'barcode' => '0099999999999',
+            'provider' => 'open_food_facts',
+            'product_name' => 'Imported Cereal',
+        ]);
+
+        Http::fake();
+
+        $cached = app(BarcodeProductLookupService::class)->find('0099999999999');
+
+        $this->assertSame('external', $cached['source']);
+        $this->assertSame(1, BarcodeLookupCache::query()->count());
+        Http::assertNothingSent();
     }
 
     public function test_stock_entry_increases_current_stock_and_can_update_product_prices(): void
@@ -407,6 +497,7 @@ class InventoryCoreTest extends TestCase
             'product_group' => 'Perfume',
             'name' => 'Zara Gold Perfume',
             'sku' => 'COS-PERF-ZARA-50',
+            'barcode' => fake()->unique()->numerify('#############'),
             'brand' => 'Zara',
             'variant' => '50ml',
             'purchase_price' => 18500,

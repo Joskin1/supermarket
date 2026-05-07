@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Sales;
 
+use App\Actions\Sales\CreateQuickSalesRecordAction;
 use App\Actions\Sales\CreateSalesImportBatchAction;
 use App\Actions\Sales\ProcessSalesImportAction;
 use App\Enums\RoleEnum;
@@ -286,6 +287,84 @@ class DailySalesWorkflowTest extends TestCase
         $this->assertDatabaseCount('sales_import_failures', 1);
     }
 
+    public function test_sales_import_can_resolve_products_by_scanned_barcode(): void
+    {
+        $admin = $this->makeAdmin();
+        $product = $this->makeProduct([
+            'barcode' => '012345678905',
+            'current_stock' => 5,
+            'selling_price' => 500,
+        ]);
+
+        $batch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $this->makeSalesWorkbookUpload(
+                [
+                    $this->salesEntryRow([
+                        'barcode' => $product->barcode,
+                        'sku' => '',
+                        'unit_price' => '',
+                        'quantity_sold' => 2,
+                        'total_amount' => '',
+                    ]),
+                ],
+                [$this->referenceRowForProduct($product)],
+            ),
+            'uploaded_by' => $admin->id,
+        ]);
+
+        $processed = app(ProcessSalesImportAction::class)->execute($batch);
+        $product->refresh();
+
+        $this->assertSame(SalesImportBatchStatus::PROCESSED, $processed->status);
+        $this->assertSame(1, $processed->successful_rows);
+        $this->assertSame(3, $product->current_stock);
+        $this->assertDatabaseHas('sales_records', [
+            'batch_id' => $batch->id,
+            'product_id' => $product->id,
+            'quantity_sold' => 2,
+            'unit_price' => 500,
+            'total_amount' => 1000,
+        ]);
+    }
+
+    public function test_quick_online_sale_can_be_recorded_by_scanned_barcode(): void
+    {
+        $admin = $this->makeAdmin();
+        $product = $this->makeProduct([
+            'barcode' => '012345678905',
+            'current_stock' => 6,
+            'selling_price' => 500,
+        ]);
+
+        $record = app(CreateQuickSalesRecordAction::class)->execute([
+            'barcode' => $product->barcode,
+            'quantity_sold' => 2,
+            'sales_date' => '2026-04-10',
+            'sales_time' => '13:45',
+            'note' => 'Counter sale',
+            'created_by' => $admin->id,
+        ]);
+
+        $product->refresh();
+
+        $this->assertSame($product->id, $record->product_id);
+        $this->assertSame(4, $product->current_stock);
+        $this->assertDatabaseHas('sales_import_batches', [
+            'id' => $record->batch_id,
+            'file_name' => 'Direct sale',
+            'successful_rows' => 1,
+            'total_quantity_sold' => 2,
+        ]);
+        $this->assertDatabaseHas('sales_records', [
+            'id' => $record->id,
+            'product_id' => $product->id,
+            'quantity_sold' => 2,
+            'unit_price' => 500,
+            'total_amount' => 1000,
+            'sales_time' => '13:45:00',
+        ]);
+    }
+
     public function test_duplicate_file_detection_blocks_reimport(): void
     {
         $admin = $this->makeAdmin();
@@ -347,7 +426,7 @@ class DailySalesWorkflowTest extends TestCase
 
         $this->get('/admin/daily-sales-export')
             ->assertOk()
-            ->assertSeeText('Sales Entry Log');
+            ->assertSeeText('Daily Sales Entry');
     }
 
     public function test_sales_import_batches_are_accessible_to_sudo_users(): void
@@ -401,6 +480,7 @@ class DailySalesWorkflowTest extends TestCase
             'name' => 'Coca-Cola Classic Soft Drink',
             'slug' => 'coca-cola-classic-soft-drink-50cl',
             'sku' => 'SKU-001',
+            'barcode' => '012345678905',
             'brand' => 'Coca-Cola',
             'variant' => '50cl',
             'purchase_price' => 400,
