@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'barcode_lookup' => [
+        'providers' => array_filter(explode(',', env('BARCODE_LOOKUP_PROVIDERS', 'open_food_facts'))),
+    ],
+
 ];
