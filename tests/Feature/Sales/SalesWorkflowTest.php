@@ -126,9 +126,12 @@ class SalesWorkflowTest extends TestCase
         $this->assertSame('time', $sheet?->getCell('B1')->getValue());
         $this->assertNull($sheet?->getCell('B2')->getValue());
         $this->assertStringStartsWith('=IF($C2=', (string) $sheet?->getCell('D2')->getValue());
+        $this->assertStringContainsString('MATCH($C2', (string) $sheet?->getCell('D2')->getValue());
         $this->assertStringStartsWith('=IF($C2<>', (string) $sheet?->getCell('E2')->getValue());
+        $this->assertStringContainsString('MATCH($C2', (string) $sheet?->getCell('E2')->getValue());
         $this->assertStringContainsString('MATCH($D2', (string) $sheet?->getCell('E2')->getValue());
         $this->assertStringStartsWith('=IF($C2<>', (string) $sheet?->getCell('F2')->getValue());
+        $this->assertStringContainsString('MATCH($C2', (string) $sheet?->getCell('F2')->getValue());
         $this->assertStringContainsString('MATCH($D2', (string) $sheet?->getCell('F2')->getValue());
         $this->assertStringStartsWith('=IF(OR($F2=', (string) $sheet?->getCell('H2')->getValue());
         $this->assertTrue($sheet?->getProtection()->getSheet());
@@ -235,6 +238,67 @@ class SalesWorkflowTest extends TestCase
             'unit_price' => 2400,
             'total_amount' => 4800,
             'sales_time' => '10:45:00',
+        ]);
+    }
+
+    public function test_exported_template_round_trips_a_barcode_scanned_sale_without_manual_sku_or_price(): void
+    {
+        $uploader = User::factory()->create();
+        $product = Product::factory()->create([
+            'sku' => 'SKU-BARCODE-ROUNDTRIP',
+            'barcode' => '5012345678900',
+            'name' => 'Barcode Round Trip Product',
+            'selling_price' => 1350,
+            'current_stock' => 11,
+            'is_active' => true,
+        ]);
+
+        $binary = Excel::raw(
+            new DailySalesTemplateExport(CarbonImmutable::parse('2026-04-11')),
+            \Maatwebsite\Excel\Excel::XLSX,
+        );
+
+        $spreadsheet = $this->loadSpreadsheetFromBinary($binary);
+        $referenceSheet = $spreadsheet->getSheetByName(DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET);
+        $entrySheet = $spreadsheet->getSheetByName(DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET);
+
+        $this->assertSame($product->barcode, (string) $referenceSheet?->getCell('A2')->getValue());
+        $this->assertSame($product->sku, $referenceSheet?->getCell('B2')->getValue());
+        $this->assertSame($product->name, $referenceSheet?->getCell('D2')->getValue());
+        $this->assertSame('2026-04-11', $entrySheet?->getCell('A2')->getFormattedValue());
+
+        $entrySheet?->setCellValue('B2', '16:20');
+        $entrySheet?->setCellValue('C2', $product->barcode);
+        $entrySheet?->setCellValue('G2', 3);
+
+        $upload = UploadedFile::fake()->createWithContent(
+            'daily-sales-barcode-round-trip.xlsx',
+            $this->saveSpreadsheetToBinary($spreadsheet),
+        );
+
+        $batch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $upload,
+            'uploaded_by' => $uploader->id,
+        ]);
+
+        $processedBatch = app(ProcessSalesImportAction::class)->execute($batch);
+
+        $this->assertSame(SalesImportBatchStatus::PROCESSED, $processedBatch->status);
+        $this->assertSame(1, $processedBatch->successful_rows);
+        $this->assertSame(0, $processedBatch->failed_rows);
+        $this->assertSame(8, $product->fresh()->current_stock);
+
+        $this->assertDatabaseHas('sales_records', [
+            'batch_id' => $batch->id,
+            'product_id' => $product->id,
+            'product_code_snapshot' => $product->sku,
+            'product_name_snapshot' => $product->name,
+            'quantity_sold' => 3,
+            'unit_price' => 1350,
+            'total_amount' => 4050,
+            'sales_date' => '2026-04-11',
+            'sales_time' => '16:20:00',
+            'source_row_number' => 2,
         ]);
     }
 

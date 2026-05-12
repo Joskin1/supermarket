@@ -6,6 +6,7 @@ use App\Models\BarcodeLookup;
 use App\Models\Product;
 use App\Services\Barcode\Contracts\BarcodeLookupProviderInterface;
 use App\Services\Barcode\Providers\OpenFoodFactsProvider;
+use App\Services\Barcode\Providers\UpcItemDbProvider;
 
 class BarcodeLookupService
 {
@@ -13,7 +14,7 @@ class BarcodeLookupService
      * Lookup order:
      * 1. Local product database
      * 2. Barcode lookup cache (previous API results)
-     * 3. External API providers (OpenFoodFacts → future fallbacks)
+     * 3. External API providers (OpenFoodFacts → UPCitemdb → future fallbacks)
      */
     public function lookup(string $barcode): BarcodeLookupResult
     {
@@ -29,6 +30,7 @@ class BarcodeLookupService
                 productName: $product->name,
                 brand: $product->brand,
                 categoryHint: $product->category?->name,
+                description: $product->description,
                 product: $product,
             );
         }
@@ -68,15 +70,33 @@ class BarcodeLookupService
 
     /**
      * Registered API providers in lookup priority order.
+     * Configurable via BARCODE_LOOKUP_PROVIDERS env variable.
      *
      * @return array<int, BarcodeLookupProviderInterface>
      */
     protected function providers(): array
     {
-        return [
-            app(OpenFoodFactsProvider::class),
-            // Future: app(UpcItemDbProvider::class),
+        $configured = (array) config('services.barcode_lookup.providers', ['open_food_facts']);
+
+        $available = [
+            'open_food_facts' => OpenFoodFactsProvider::class,
+            'upcitemdb' => UpcItemDbProvider::class,
         ];
+
+        $providers = [];
+
+        foreach ($configured as $key) {
+            if (isset($available[$key])) {
+                $providers[] = app($available[$key]);
+            }
+        }
+
+        // Always include at least OpenFoodFacts.
+        if ($providers === []) {
+            $providers[] = app(OpenFoodFactsProvider::class);
+        }
+
+        return $providers;
     }
 
     protected function cacheResult(
@@ -96,3 +116,4 @@ class BarcodeLookupService
         );
     }
 }
+

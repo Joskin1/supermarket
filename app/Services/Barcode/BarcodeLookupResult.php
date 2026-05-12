@@ -18,6 +18,8 @@ final readonly class BarcodeLookupResult
         public ?string $productName = null,
         public ?string $brand = null,
         public ?string $categoryHint = null,
+        public ?string $description = null,
+        public ?string $imageUrl = null,
         public ?string $apiProvider = null,
         public ?Product $product = null,
     ) {}

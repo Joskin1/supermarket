@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Inventory\SkuGenerator;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -22,6 +23,7 @@ use Illuminate\Support\Str;
     'brand',
     'variant',
     'description',
+    'source',
     'purchase_price',
     'selling_price',
     'current_stock',
@@ -47,6 +49,16 @@ class Product extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (self $product): void {
+            if (blank($product->sku)) {
+                $product->sku = app(SkuGenerator::class)->generate();
+            }
+
+            if (blank($product->source)) {
+                $product->source = 'manual';
+            }
+        });
+
         static::saving(function (self $product): void {
             if (blank($product->slug) && filled($product->name)) {
                 $product->slug = Str::slug(trim($product->name.' '.$product->variant));

@@ -59,7 +59,6 @@ class ReceiveStock extends Page
     public string $newProductName = '';
     public string $newProductBrand = '';
     public ?int $newProductCategoryId = null;
-    public string $newProductSku = '';
     public string $newProductPurchasePrice = '';
     public string $newProductSellingPrice = '';
     public string $newProductUnitOfMeasure = 'pcs';
@@ -176,7 +175,6 @@ class ReceiveStock extends Page
     {
         $this->validate([
             'newProductName' => ['required', 'string', 'max:255'],
-            'newProductSku' => ['required', 'string', 'max:255', 'unique:products,sku'],
             'newProductCategoryId' => ['required', 'integer', 'exists:categories,id'],
             'newProductPurchasePrice' => ['required', 'numeric', 'min:0'],
             'newProductSellingPrice' => ['required', 'numeric', 'min:0'],
@@ -199,12 +197,17 @@ class ReceiveStock extends Page
 
         try {
             DB::transaction(function (): void {
+                $source = match ($this->state) {
+                    'api_found' => $this->lookupData['apiProvider'] ?? 'api',
+                    default => 'manual',
+                };
+
                 $product = Product::query()->create([
                     'category_id' => $this->newProductCategoryId,
                     'name' => $this->newProductName,
-                    'sku' => strtoupper(trim($this->newProductSku)),
                     'barcode' => $this->barcode,
                     'brand' => $this->newProductBrand ?: null,
+                    'source' => $source,
                     'purchase_price' => $this->newProductPurchasePrice,
                     'selling_price' => $this->newProductSellingPrice,
                     'unit_of_measure' => $this->newProductUnitOfMeasure ?: 'pcs',
@@ -258,7 +261,6 @@ class ReceiveStock extends Page
         $this->newProductName = '';
         $this->newProductBrand = '';
         $this->newProductCategoryId = null;
-        $this->newProductSku = '';
         $this->newProductPurchasePrice = '';
         $this->newProductSellingPrice = '';
         $this->newProductUnitOfMeasure = 'pcs';

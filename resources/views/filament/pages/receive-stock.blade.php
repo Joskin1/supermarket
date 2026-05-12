@@ -190,9 +190,10 @@
                                     class="fi-input block w-full rounded-lg border-gray-300 shadow-sm transition duration-75 focus:border-primary-500 focus:ring-1 focus:ring-inset focus:ring-primary-500 dark:border-white/10 dark:bg-white/5 dark:text-white" />
                             </div>
                             <div class="space-y-1">
-                                <label class="fi-fo-field-wrp-label text-sm font-medium text-gray-950 dark:text-white">SKU / Internal code <sup class="text-danger-600">*</sup></label>
-                                <input type="text" wire:model="newProductSku" required
-                                    class="fi-input block w-full rounded-lg border-gray-300 shadow-sm transition duration-75 focus:border-primary-500 focus:ring-1 focus:ring-inset focus:ring-primary-500 dark:border-white/10 dark:bg-white/5 dark:text-white" />
+                                <label class="fi-fo-field-wrp-label text-sm font-medium text-gray-950 dark:text-white">SKU</label>
+                                <div class="flex h-[42px] items-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 text-sm text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400">
+                                    Auto-generated on save
+                                </div>
                             </div>
                             <div class="space-y-1">
                                 <label class="fi-fo-field-wrp-label text-sm font-medium text-gray-950 dark:text-white">Brand</label>

@@ -6,6 +6,8 @@ use App\Enums\RoleEnum;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\Barcode\BarcodeLookupResult;
+use App\Services\Barcode\BarcodeLookupService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -131,7 +133,6 @@ class ReceiveStockTest extends TestCase
         // Fill product + stock details.
         $component
             ->set('newProductName', 'Test New Product')
-            ->set('newProductSku', 'TST-NEW-001')
             ->set('newProductCategoryId', $category->id)
             ->set('newProductPurchasePrice', '1000.00')
             ->set('newProductSellingPrice', '1500.00')
@@ -145,7 +146,7 @@ class ReceiveStockTest extends TestCase
         $this->assertDatabaseHas('products', [
             'barcode' => '0000999999999',
             'name' => 'Test New Product',
-            'sku' => 'TST-NEW-001',
+            'source' => 'manual',
         ]);
 
         // Verify stock entry.
@@ -154,6 +155,66 @@ class ReceiveStockTest extends TestCase
         $this->assertSame(50, $newProduct->current_stock);
 
         // Verify state reset.
+        $this->assertSame('scanning', $component->get('state'));
+    }
+
+    public function test_stock_in_can_create_api_found_product_with_barcode_and_initial_stock(): void
+    {
+        $this->app->instance(BarcodeLookupService::class, new class extends BarcodeLookupService
+        {
+            public function lookup(string $barcode): BarcodeLookupResult
+            {
+                return new BarcodeLookupResult(
+                    barcode: trim($barcode),
+                    source: 'api',
+                    productName: 'Imported Barcode Product',
+                    brand: 'Lookup Brand',
+                    categoryHint: 'Pantry',
+                    apiProvider: 'open_food_facts',
+                );
+            }
+        });
+
+        $admin = $this->makeAdmin();
+        $category = Category::factory()->create(['name' => 'Pantry']);
+
+        $this->actingAs($admin);
+
+        $component = $this->livewireTest()
+            ->set('barcode', ' 5012345678900 ')
+            ->call('scanBarcode');
+
+        $this->assertSame('api_found', $component->get('state'));
+        $this->assertSame('5012345678900', $component->get('barcode'));
+        $this->assertSame('Imported Barcode Product', $component->get('newProductName'));
+        $this->assertSame('Lookup Brand', $component->get('newProductBrand'));
+
+        $component
+            ->set('newProductCategoryId', $category->id)
+            ->set('newProductPurchasePrice', '1200.00')
+            ->set('newProductSellingPrice', '1800.00')
+            ->set('quantityAdded', '18')
+            ->set('unitCostPrice', '1200.00')
+            ->set('unitSellingPrice', '1800.00')
+            ->set('stockDate', now()->toDateString())
+            ->set('reference', 'PO-1001')
+            ->call('createProductAndAddStock');
+
+        $product = Product::query()->where('barcode', '5012345678900')->first();
+
+        $this->assertNotNull($product);
+        $this->assertSame('Imported Barcode Product', $product->name);
+        $this->assertSame('Lookup Brand', $product->brand);
+        $this->assertSame('open_food_facts', $product->source);
+        $this->assertSame(18, $product->current_stock);
+        $this->assertNotEmpty($product->sku);
+
+        $this->assertDatabaseHas('stock_entries', [
+            'product_id' => $product->id,
+            'quantity_added' => 18,
+            'reference' => 'PO-1001',
+            'created_by' => $admin->id,
+        ]);
         $this->assertSame('scanning', $component->get('state'));
     }
 
