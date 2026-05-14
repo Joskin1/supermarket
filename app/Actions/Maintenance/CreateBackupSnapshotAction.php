@@ -22,7 +22,7 @@ class CreateBackupSnapshotAction
         $backupCode = $this->generateBackupCode();
         $settings = SystemSetting::current();
         $tables = BackupSnapshotTables::all();
-        $businessSlug = Str::slug($settings->business_name ?: config('app.name')) ?: 'supermarket';
+        $businessSlug = Str::slug($settings->business_name ?: config('app.name')) ?: 'white-mart';
         $fileName = $businessSlug.'-backup-'.$timestamp->format('Y-m-d-His').'-'.Str::lower(Str::afterLast($backupCode, '-')).'.json';
         $filePath = 'backups/'.$timestamp->format('Y/m').'/'.$fileName;
 

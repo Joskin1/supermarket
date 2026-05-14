@@ -16,7 +16,7 @@ class ProductionReadinessTest extends TestCase
         config([
             'app.env' => 'production',
             'app.debug' => true,
-            'app.url' => 'http://supermarket.example',
+            'app.url' => 'http://white-mart.example',
             'mail.default' => 'log',
             'queue.default' => 'sync',
         ]);
@@ -40,7 +40,7 @@ class ProductionReadinessTest extends TestCase
         config([
             'app.env' => 'production',
             'app.debug' => false,
-            'app.url' => 'https://supermarket.example',
+            'app.url' => 'https://white-mart.example',
             'mail.default' => 'smtp',
             'queue.default' => 'database',
         ]);

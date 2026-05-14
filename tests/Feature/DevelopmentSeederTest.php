@@ -33,7 +33,7 @@ class DevelopmentSeederTest extends TestCase
         $this->assertNotNull($sudo);
         $this->assertTrue($sudo->isSudo());
         $this->assertDatabaseHas('users', [
-            'email' => 'store-manager@supermarket.test',
+            'email' => 'store-manager@white-mart.test',
         ]);
         $this->assertGreaterThan(0, Category::query()->count());
         $this->assertGreaterThan(0, Product::query()->count());

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title ?? 'White-Mart' }}</title>
-    <meta name="description" content="White-Mart supermarket at Iyana Era, Ijanikin, Lagos. Fresh groceries, household essentials, beverages & more.">
+    <meta name="description" content="White-Mart at Iyana Era, Ijanikin, Lagos. Fresh groceries, household essentials, beverages & more.">
     <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800,900" rel="stylesheet" />

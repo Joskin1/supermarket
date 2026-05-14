@@ -22,7 +22,7 @@ class UpcItemDbProvider implements BarcodeLookupProviderInterface
         try {
             $response = Http::timeout((float) config('services.barcode_lookup.timeout_seconds', 2))
                 ->connectTimeout((float) config('services.barcode_lookup.connect_timeout_seconds', 1))
-                ->withUserAgent(config('app.name', 'Supermarket').' barcode lookup ('.config('app.url').')')
+                ->withUserAgent(config('app.name', 'White-Mart').' barcode lookup ('.config('app.url').')')
                 ->acceptJson()
                 ->get(self::BASE_URL, [
                     'upc' => $barcode,

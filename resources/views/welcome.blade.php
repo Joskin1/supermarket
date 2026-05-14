@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>White-Mart — Freshness & Quality Every Day</title>
-    <meta name="description" content="White-Mart supermarket at Iyana Era, Ijanikin, Lagos. Fresh groceries, household essentials, beverages & more. Open Mon-Sat 8AM-9PM, Sun 10AM-8PM.">
+    <meta name="description" content="White-Mart at Iyana Era, Ijanikin, Lagos. Fresh groceries, household essentials, beverages & more. Open Mon-Sat 8AM-9PM, Sun 10AM-8PM.">
     <link rel="icon" href="/favicon.ico" sizes="any">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800,900" rel="stylesheet" />
@@ -52,14 +52,14 @@
         <div class="relative z-10 max-w-4xl mx-auto px-6 text-center">
             <span class="inline-block px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest text-white/90 border border-white/20 backdrop-blur-sm mb-6"
                   style="background:rgba(0,146,69,0.35)">
-                🛒 Your Neighborhood Supermarket
+                🛒 Your Neighborhood Store
             </span>
             <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-tight mb-6">
                 Welcome to <span style="color:#4ade80">White-Mart</span><br>
                 <span class="text-3xl sm:text-4xl lg:text-5xl font-bold text-white/90">Freshness & Quality Every Day</span>
             </h1>
             <p class="text-lg sm:text-xl text-white/80 max-w-2xl mx-auto mb-10">
-                Your trusted neighborhood supermarket at Iyana Era, Ijanikin. Fresh groceries, household essentials, and everything your family needs — all under one roof.
+                Your trusted neighborhood store at Iyana Era, Ijanikin. Fresh groceries, household essentials, and everything your family needs — all under one roof.
             </p>
             <div class="flex flex-col sm:flex-row gap-4 justify-center">
                 <a href="#location"
@@ -112,7 +112,7 @@
                     <span class="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-4" style="background:#e6f4ec;color:var(--wm-green)">About Us</span>
                     <h2 class="text-3xl sm:text-4xl font-extrabold mb-6" style="color:var(--wm-dark)">Serving the Ijanikin Community with Pride</h2>
                     <p class="text-gray-600 leading-relaxed mb-6">
-                        White-Mart is more than just a supermarket — we're your neighbors. Located in the heart of Iyana Era, Ijanikin, we've built our reputation on three simple promises: <strong>fresh products</strong>, <strong>fair prices</strong>, and <strong>friendly service</strong>.
+                        White-Mart is more than just a store — we're your neighbors. Located in the heart of Iyana Era, Ijanikin, we've built our reputation on three simple promises: <strong>fresh products</strong>, <strong>fair prices</strong>, and <strong>friendly service</strong>.
                     </p>
                     <p class="text-gray-600 leading-relaxed mb-8">
                         From everyday pantry staples to trusted household brands, we stock everything your family needs. Our shelves are restocked daily to ensure you always find what you're looking for.

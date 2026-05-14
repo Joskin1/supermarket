@@ -14,7 +14,7 @@ class SystemSettingFactory extends Factory
     {
         return [
             'singleton_key' => SystemSetting::SINGLETON_KEY,
-            'business_name' => 'Supermarket HQ',
+            'business_name' => 'White-Mart HQ',
             'business_timezone' => 'Africa/Lagos',
             'currency_code' => 'NGN',
             'low_stock_contact_email' => fake()->safeEmail(),

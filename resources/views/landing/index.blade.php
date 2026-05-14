@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>White-Mart Supermarket | Freshness & Quality Every Day</title>
-    <meta name="description" content="Your trusted neighborhood supermarket at Iyana Era, Ijanikin.">
+    <title>White-Mart | Freshness & Quality Every Day</title>
+    <meta name="description" content="Your trusted neighborhood store at Iyana Era, Ijanikin.">
 
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@400;500;700&display=swap" rel="stylesheet">
@@ -138,7 +138,7 @@
                             Freshness & Quality
                         </h1>
                         <p class="text-zinc-600 leading-relaxed text-lg md:text-xl max-w-2xl mx-auto lg:mx-0 mb-10">
-                            Your trusted neighborhood supermarket at Iyana Era, Ijanikin. We provide the best products
+                            Your trusted neighborhood store at Iyana Era, Ijanikin. We provide the best products
                             at the most affordable prices every single day.
                         </p>
 
@@ -160,7 +160,7 @@
                         <div class="relative rounded-2xl overflow-hidden shadow-2xl transform hover:scale-[1.02] transition-transform duration-500 bg-zinc-100 flex items-center justify-center"
                             style="min-height: 400px;">
                             <img src="/landing-img/hero" class="w-full h-full object-cover absolute inset-0"
-                                alt="White-Mart Supermarket Interior">
+                                alt="White-Mart Interior">
                             <div class="text-zinc-400 font-medium italic z-10" id="hero-placeholder"
                                 style="display: none;">Hero Image Generating...</div>
                         </div>
@@ -340,7 +340,7 @@
     <footer class="bg-zinc-950 text-zinc-400 py-8 border-t border-zinc-800">
         <div class="container xl:max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center text-sm">
             <div class="mb-4 md:mb-0">
-                &copy; {{ date('Y') }} White-Mart Supermarket. All rights reserved.
+                &copy; {{ date('Y') }} White-Mart. All rights reserved.
             </div>
             <div>
                 <a href="/login" class="hover:text-white transition-colors duration-200">System Login</a>

@@ -10,7 +10,7 @@ use InvalidArgumentException;
 
 class SudoUserSeeder extends Seeder
 {
-    private const DEFAULT_NAME = 'Supermarket Sudo';
+    private const DEFAULT_NAME = 'White-Mart Sudo';
 
     public function run(): void
     {

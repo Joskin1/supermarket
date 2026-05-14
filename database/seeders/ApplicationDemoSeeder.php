@@ -65,15 +65,15 @@ class ApplicationDemoSeeder extends Seeder
             'sudo' => $sudo,
             'store_manager' => $this->upsertAdminUser(
                 'Adaeze Manager',
-                'store-manager@supermarket.test',
+                'store-manager@white-mart.test',
             ),
             'inventory_admin' => $this->upsertAdminUser(
                 'Kunle Inventory',
-                'inventory-admin@supermarket.test',
+                'inventory-admin@white-mart.test',
             ),
             'sales_admin' => $this->upsertAdminUser(
                 'Bola Sales',
-                'sales-admin@supermarket.test',
+                'sales-admin@white-mart.test',
             ),
         ];
 
@@ -82,7 +82,7 @@ class ApplicationDemoSeeder extends Seeder
 
     protected function seedDemoSudo(): void
     {
-        $email = env('DEMO_SUDO_EMAIL', env('SUDO_EMAIL', 'demo-sudo@supermarket.test'));
+        $email = env('DEMO_SUDO_EMAIL', env('SUDO_EMAIL', 'demo-sudo@white-mart.test'));
         $password = env('DEMO_SUDO_PASSWORD', env('SUDO_PASSWORD'));
 
         if (blank($password)) {
@@ -221,11 +221,11 @@ class ApplicationDemoSeeder extends Seeder
     {
         $settings = SystemSetting::current();
         $settings->fill([
-            'business_name' => 'Akin Joseph Supermarket',
+            'business_name' => 'White-Mart',
             'business_timezone' => 'Africa/Lagos',
             'currency_code' => 'NGN',
             'low_stock_contact_email' => 'akinjoseph221@gmail.com',
-            'receipt_footer' => 'Thank you for shopping with Akin Joseph Supermarket.',
+            'receipt_footer' => 'Thank you for shopping with White-Mart.',
         ]);
 
         $shouldLog = $settings->wasRecentlyCreated || $settings->isDirty();
