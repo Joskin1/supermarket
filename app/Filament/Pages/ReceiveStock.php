@@ -118,6 +118,7 @@ class ReceiveStock extends Page
             // API or cache result — prefill new product form.
             $this->newProductName = $result->productName ?? '';
             $this->newProductBrand = $result->brand ?? '';
+            $this->newProductCategoryId = $this->findCategoryIdForHint($result->categoryHint);
             $this->state = 'api_found';
 
             return;
@@ -277,5 +278,33 @@ class ReceiveStock extends Page
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();
+    }
+
+    protected function findCategoryIdForHint(?string $categoryHint): ?int
+    {
+        if (blank($categoryHint)) {
+            return null;
+        }
+
+        $hint = str($categoryHint)
+            ->lower()
+            ->replace(['-', '_'], ' ')
+            ->squish()
+            ->toString();
+
+        return Category::query()
+            ->get(['id', 'name'])
+            ->first(function (Category $category) use ($hint): bool {
+                $name = str($category->name)
+                    ->lower()
+                    ->replace(['-', '_'], ' ')
+                    ->squish()
+                    ->toString();
+
+                return $hint === $name
+                    || str_contains($hint, $name)
+                    || str_contains($name, $hint);
+            })
+            ?->id;
     }
 }

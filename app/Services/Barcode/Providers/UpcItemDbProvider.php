@@ -12,12 +12,6 @@ class UpcItemDbProvider implements BarcodeLookupProviderInterface
 {
     protected const BASE_URL = 'https://api.upcitemdb.com/prod/trial/lookup';
 
-    protected const TIMEOUT_SECONDS = 5;
-
-    protected const RETRY_TIMES = 2;
-
-    protected const RETRY_DELAY_MS = 300;
-
     public function name(): string
     {
         return 'upcitemdb';
@@ -26,8 +20,9 @@ class UpcItemDbProvider implements BarcodeLookupProviderInterface
     public function lookup(string $barcode): ?BarcodeLookupResult
     {
         try {
-            $response = Http::timeout(self::TIMEOUT_SECONDS)
-                ->retry(self::RETRY_TIMES, self::RETRY_DELAY_MS)
+            $response = Http::timeout((float) config('services.barcode_lookup.timeout_seconds', 2))
+                ->connectTimeout((float) config('services.barcode_lookup.connect_timeout_seconds', 1))
+                ->withUserAgent(config('app.name', 'Supermarket').' barcode lookup ('.config('app.url').')')
                 ->acceptJson()
                 ->get(self::BASE_URL, [
                     'upc' => $barcode,

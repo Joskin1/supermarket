@@ -135,12 +135,76 @@ class BarcodeLookupTest extends TestCase
         $this->assertSame('Coca-Cola Classic', $cached->product_name);
     }
 
+    public function test_open_products_facts_can_fill_lookup_when_food_facts_misses(): void
+    {
+        config(['services.barcode_lookup.providers' => ['open_food_facts', 'open_products_facts']]);
+
+        Http::fake([
+            'world.openfoodfacts.org/*' => Http::response([
+                'status' => 0,
+                'product' => null,
+            ]),
+            'world.openproductsfacts.org/*' => Http::response([
+                'status' => 1,
+                'product' => [
+                    'product_name' => 'General Household Product',
+                    'brands' => 'Household Brand',
+                    'categories' => 'Household supplies',
+                ],
+            ]),
+        ]);
+
+        $result = app(BarcodeLookupService::class)->lookup('6180200000124');
+
+        $this->assertTrue($result->isFromApi());
+        $this->assertSame('openproductsfacts', $result->apiProvider);
+        $this->assertSame('General Household Product', $result->productName);
+
+        $this->assertDatabaseHas('barcode_lookups', [
+            'barcode' => '6180200000124',
+            'source' => 'openproductsfacts',
+            'product_name' => 'General Household Product',
+        ]);
+    }
+
+    public function test_open_beauty_facts_can_fill_lookup_for_personal_care_items(): void
+    {
+        config(['services.barcode_lookup.providers' => ['open_food_facts', 'open_products_facts', 'open_beauty_facts']]);
+
+        Http::fake([
+            'world.openfoodfacts.org/*' => Http::response([
+                'status' => 0,
+                'product' => null,
+            ]),
+            'world.openproductsfacts.org/*' => Http::response([
+                'status' => 0,
+                'product' => null,
+            ]),
+            'world.openbeautyfacts.org/*' => Http::response([
+                'status' => 1,
+                'product' => [
+                    'product_name' => 'Body Lotion',
+                    'brands' => 'Care Brand',
+                    'categories' => 'Personal care',
+                ],
+            ]),
+        ]);
+
+        $result = app(BarcodeLookupService::class)->lookup('3560070791460');
+
+        $this->assertTrue($result->isFromApi());
+        $this->assertSame('openbeautyfacts', $result->apiProvider);
+        $this->assertSame('Body Lotion', $result->productName);
+    }
+
     // ---------------------------------------------------------------
     // BarcodeLookupService — not found
     // ---------------------------------------------------------------
 
     public function test_not_found_is_returned_when_no_source_has_the_barcode(): void
     {
+        config(['services.barcode_lookup.providers' => ['open_food_facts']]);
+
         Http::fake([
             'world.openfoodfacts.org/*' => Http::response([
                 'status' => 0,
@@ -152,6 +216,69 @@ class BarcodeLookupTest extends TestCase
 
         $this->assertTrue($result->isNotFound());
         $this->assertNull($result->productName);
+    }
+
+    public function test_recent_not_found_result_is_cached_without_calling_api_again(): void
+    {
+        config(['services.barcode_lookup.providers' => ['open_food_facts']]);
+
+        Http::fake([
+            'world.openfoodfacts.org/*' => Http::response([
+                'status' => 0,
+                'product' => null,
+            ]),
+        ]);
+
+        $first = app(BarcodeLookupService::class)->lookup('0000000000000');
+
+        $this->assertTrue($first->isNotFound());
+        $this->assertDatabaseHas('barcode_lookups', [
+            'barcode' => '0000000000000',
+            'source' => 'not_found',
+        ]);
+        Http::assertSentCount(1);
+
+        Http::fake();
+
+        $second = app(BarcodeLookupService::class)->lookup('0000000000000');
+
+        $this->assertTrue($second->isNotFound());
+        Http::assertNothingSent();
+    }
+
+    public function test_stale_not_found_cache_is_retried_when_provider_list_changes(): void
+    {
+        BarcodeLookup::factory()->create([
+            'barcode' => '6180200000124',
+            'source' => 'not_found',
+            'product_name' => null,
+            'raw_response' => [
+                'providers' => ['openfoodfacts'],
+            ],
+            'looked_up_at' => now(),
+        ]);
+
+        config(['services.barcode_lookup.providers' => ['open_food_facts', 'open_products_facts']]);
+
+        Http::fake([
+            'world.openfoodfacts.org/*' => Http::response([
+                'status' => 0,
+                'product' => null,
+            ]),
+            'world.openproductsfacts.org/*' => Http::response([
+                'status' => 1,
+                'product' => [
+                    'product_name' => 'Retried Product',
+                    'brands' => 'Fresh Source',
+                ],
+            ]),
+        ]);
+
+        $result = app(BarcodeLookupService::class)->lookup('6180200000124');
+
+        $this->assertTrue($result->isFromApi());
+        $this->assertSame('Retried Product', $result->productName);
+        Http::assertSentCount(2);
     }
 
     // ---------------------------------------------------------------

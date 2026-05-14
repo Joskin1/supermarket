@@ -115,6 +115,9 @@ class ReceiveStockTest extends TestCase
     {
         Http::fake([
             'world.openfoodfacts.org/*' => Http::response(['status' => 0]),
+            'world.openproductsfacts.org/*' => Http::response(['status' => 0]),
+            'world.openbeautyfacts.org/*' => Http::response(['status' => 0]),
+            'api.upcitemdb.com/*' => Http::response(['total' => 0, 'items' => []]),
         ]);
 
         $admin = $this->makeAdmin();
@@ -188,9 +191,9 @@ class ReceiveStockTest extends TestCase
         $this->assertSame('5012345678900', $component->get('barcode'));
         $this->assertSame('Imported Barcode Product', $component->get('newProductName'));
         $this->assertSame('Lookup Brand', $component->get('newProductBrand'));
+        $this->assertSame($category->id, $component->get('newProductCategoryId'));
 
         $component
-            ->set('newProductCategoryId', $category->id)
             ->set('newProductPurchasePrice', '1200.00')
             ->set('newProductSellingPrice', '1800.00')
             ->set('quantityAdded', '18')

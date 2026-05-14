@@ -36,7 +36,10 @@ return [
     ],
 
     'barcode_lookup' => [
-        'providers' => array_filter(explode(',', env('BARCODE_LOOKUP_PROVIDERS', 'open_food_facts,upcitemdb'))),
+        'providers' => array_filter(explode(',', env('BARCODE_LOOKUP_PROVIDERS', 'open_food_facts,open_products_facts,open_beauty_facts,upcitemdb'))),
+        'timeout_seconds' => (float) env('BARCODE_LOOKUP_TIMEOUT_SECONDS', 2),
+        'connect_timeout_seconds' => (float) env('BARCODE_LOOKUP_CONNECT_TIMEOUT_SECONDS', 1),
+        'not_found_cache_days' => (int) env('BARCODE_LOOKUP_NOT_FOUND_CACHE_DAYS', 7),
     ],
 
 ];
