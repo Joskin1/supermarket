@@ -288,7 +288,7 @@ class BarcodeLookupTest extends TestCase
     public function test_openfoodfacts_returns_null_on_timeout(): void
     {
         Http::fake([
-            'world.openfoodfacts.org/*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('Timeout'),
+            'world.openfoodfacts.org/*' => fn() => throw new \Illuminate\Http\Client\ConnectionException('Timeout'),
         ]);
 
         $provider = new OpenFoodFactsProvider;
