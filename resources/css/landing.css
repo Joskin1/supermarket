@@ -1,0 +1,96 @@
+@import 'tailwindcss';
+
+@theme {
+    --color-primary: #009245;
+    --color-secondary: #E10600;
+}
+
+:root {
+    --primary: #009245;
+    --gray: #f9f9f9;
+}
+
+/* Custom Nav slider hover */
+.navslider-hover .splide__arrow {
+  display: none;
+}
+.navslider-hover:hover .splide__arrow {
+  display: flex;
+}
+.stroke-primary {
+  stroke: var(--primary);
+}
+.grayscale  {
+    filter: grayscale(100%);
+}
+.hover-grayscale-0:hover .grayscale {
+    filter: grayscale(0%);
+}
+.navbar-scrolled {
+    background-color: #ffffff;
+    border-bottom: var(--gray) 1px solid;
+}
+.navbar>li>a.active:before {
+    background-color: var(--primary);
+}
+.menu-mobile.show .close {
+    display: block;
+}
+.menu-mobile.show .open, .menu-mobile .close {
+    display: none;
+}
+.navbar>li>a:before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: .75rem;
+    transform: translateX(-50%);
+    -webkit-transform: translateX(-50%);
+    transform-origin: 50% 50%;
+    -webkit-transform-origin: 50% 50%;
+    height: 2px;
+    width: 1.6rem;
+    background-color: transparent;
+}
+.navbar > li:hover > a:before {
+	background-color: var(--primary);
+}
+
+/*Dropdown*/
+.dropdown-menu {
+	display: none;
+}
+.dropdown-menu.show {
+	display: block;
+}
+@media (min-width: 1024px) {
+	.navbar .dropdown-menu.show {
+		display: none;
+	}
+	.navbar .dropdown:hover > .dropdown-menu, .navbar .dropdown:hover > .dropdown-menu.show {
+		display: block;
+	}
+	.navbar .dropdown-menu > li:hover > .dropdown-menu, .navbar .dropdown-menu > li:hover > .dropdown-menu.show {
+		display: block;
+	}
+}
+
+/*preloader*/
+.loaded-success .preloader {
+  visibility: hidden !important;
+  transition: all 1s ease-in-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 100px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+.fadeInUp {
+  animation-name: fadeInUp;
+}

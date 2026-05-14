@@ -3,7 +3,10 @@
 use App\Http\Controllers\BackupDownloadController;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome')->name('home');
+Route::get('/', function () {
+    return view('landing.index');
+})->name('home');
+
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('admin/backups/{backupRun}/download', BackupDownloadController::class)
@@ -21,3 +24,4 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/settings.php';
+require __DIR__.'/landing-images.php';
