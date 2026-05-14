@@ -25,6 +25,18 @@ class SalesEntryLogSheetExport implements FromArray, ShouldAutoSize, WithEvents,
         protected CarbonInterface $salesDate,
     ) {}
 
+    /**
+     * Column layout:
+     *   A = date         (pre-filled, locked)
+     *   B = time         (editable)
+     *   C = barcode      (editable — scan or type)
+     *   D = sku          (editable — type manually when scanner fails)
+     *   E = product_name (formula — auto-filled from barcode OR sku lookup)
+     *   F = unit_price   (formula — auto-filled from barcode OR sku lookup)
+     *   G = quantity_sold (editable)
+     *   H = total_amount (formula — unit_price × quantity_sold)
+     *   I = note         (editable)
+     */
     public function array(): array
     {
         $rows = [];
@@ -34,7 +46,7 @@ class SalesEntryLogSheetExport implements FromArray, ShouldAutoSize, WithEvents,
                 'date' => $this->salesDate->toDateString(),
                 'time' => null,
                 'barcode' => null,
-                'sku' => $this->skuFormula($rowNumber),
+                'sku' => null,
                 'product_name' => $this->productNameFormula($rowNumber),
                 'unit_price' => $this->unitPriceFormula($rowNumber),
                 'quantity_sold' => null,
@@ -78,19 +90,33 @@ class SalesEntryLogSheetExport implements FromArray, ShouldAutoSize, WithEvents,
 
                 $sheet->freezePane('A2');
                 $sheet->setAutoFilter("A1:I{$highestRow}");
+
+                // Column widths for scanner-friendly layout.
                 $sheet->getColumnDimension('B')->setWidth(18);
+                $sheet->getColumnDimension('C')->setWidth(20);
+                $sheet->getColumnDimension('D')->setWidth(18);
+
+                // Number formats.
                 $sheet->getStyle("A2:A{$highestRow}")
                     ->getNumberFormat()
                     ->setFormatCode(NumberFormat::FORMAT_DATE_YYYYMMDD2);
                 $sheet->getStyle("B2:B{$highestRow}")
                     ->getNumberFormat()
                     ->setFormatCode('hh:mm');
+                // Barcode as text to preserve leading zeros.
+                $sheet->getStyle("C2:C{$highestRow}")
+                    ->getNumberFormat()
+                    ->setFormatCode(NumberFormat::FORMAT_TEXT);
+                // SKU as text.
+                $sheet->getStyle("D2:D{$highestRow}")
+                    ->getNumberFormat()
+                    ->setFormatCode(NumberFormat::FORMAT_TEXT);
                 $sheet->getStyle("F2:H{$highestRow}")
                     ->getNumberFormat()
                     ->setFormatCode(NumberFormat::FORMAT_NUMBER_00);
 
-                // Keep reference-driven columns visually distinct while leaving the row editable.
-                $sheet->getStyle("D2:F{$highestRow}")
+                // Visual styling: formula columns get gray background.
+                $sheet->getStyle("E2:F{$highestRow}")
                     ->getFill()
                     ->setFillType(Fill::FILL_SOLID)
                     ->getStartColor()
@@ -101,6 +127,15 @@ class SalesEntryLogSheetExport implements FromArray, ShouldAutoSize, WithEvents,
                     ->getStartColor()
                     ->setRGB('ECFDF5');
 
+                // Editable columns get a subtle highlight so cashiers know where to type.
+                foreach (['C', 'D'] as $col) {
+                    $sheet->getStyle("{$col}2:{$col}{$highestRow}")
+                        ->getFill()
+                        ->setFillType(Fill::FILL_SOLID)
+                        ->getStartColor()
+                        ->setRGB('FFFBEB');
+                }
+
                 $this->applyDateValidation($sheet, $highestRow);
                 $this->applyTimeValidation($sheet, $highestRow);
                 $this->applyProtectionRules($sheet, $highestRow);
@@ -110,57 +145,45 @@ class SalesEntryLogSheetExport implements FromArray, ShouldAutoSize, WithEvents,
         ];
     }
 
-    protected function skuFormula(int $rowNumber): string
-    {
-        return sprintf(
-            '=IF($C%d="","",IFERROR(INDEX(\'%s\'!$B$2:$B$%d,MATCH($C%d,\'%s\'!$A$2:$A$%d,0)),""))',
-            $rowNumber,
-            DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET,
-            DailySalesTemplateColumns::ENTRY_TEMPLATE_ROWS + 1,
-            $rowNumber,
-            DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET,
-            DailySalesTemplateColumns::ENTRY_TEMPLATE_ROWS + 1,
-        );
-    }
+    // ─── Formula generators ──────────────────────────────────────────
 
+    /**
+     * Product name lookup: barcode first, then SKU fallback.
+     *
+     * IF barcode (C) is filled → INDEX/MATCH against reference barcode column (A)
+     * ELSE IF sku (D) is filled → INDEX/MATCH against reference SKU column (B)
+     * ELSE → empty
+     */
     protected function productNameFormula(int $rowNumber): string
     {
+        $ref = DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET;
+        $max = DailySalesTemplateColumns::ENTRY_TEMPLATE_ROWS + 1;
+
         return sprintf(
             '=IF($C%d<>"",IFERROR(INDEX(\'%s\'!$D$2:$D$%d,MATCH($C%d,\'%s\'!$A$2:$A$%d,0)),""),IF($D%d<>"",IFERROR(INDEX(\'%s\'!$D$2:$D$%d,MATCH($D%d,\'%s\'!$B$2:$B$%d,0)),""),""))',
-            $rowNumber,
-            DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET,
-            DailySalesTemplateColumns::ENTRY_TEMPLATE_ROWS + 1,
-            $rowNumber,
-            DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET,
-            DailySalesTemplateColumns::ENTRY_TEMPLATE_ROWS + 1,
-            $rowNumber,
-            DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET,
-            DailySalesTemplateColumns::ENTRY_TEMPLATE_ROWS + 1,
-            $rowNumber,
-            DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET,
-            DailySalesTemplateColumns::ENTRY_TEMPLATE_ROWS + 1,
+            $rowNumber, $ref, $max, $rowNumber, $ref, $max,
+            $rowNumber, $ref, $max, $rowNumber, $ref, $max,
         );
     }
 
+    /**
+     * Unit price lookup: barcode first, then SKU fallback.
+     */
     protected function unitPriceFormula(int $rowNumber): string
     {
+        $ref = DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET;
+        $max = DailySalesTemplateColumns::ENTRY_TEMPLATE_ROWS + 1;
+
         return sprintf(
             '=IF($C%d<>"",IFERROR(INDEX(\'%s\'!$E$2:$E$%d,MATCH($C%d,\'%s\'!$A$2:$A$%d,0)),""),IF($D%d<>"",IFERROR(INDEX(\'%s\'!$E$2:$E$%d,MATCH($D%d,\'%s\'!$B$2:$B$%d,0)),""),""))',
-            $rowNumber,
-            DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET,
-            DailySalesTemplateColumns::ENTRY_TEMPLATE_ROWS + 1,
-            $rowNumber,
-            DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET,
-            DailySalesTemplateColumns::ENTRY_TEMPLATE_ROWS + 1,
-            $rowNumber,
-            DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET,
-            DailySalesTemplateColumns::ENTRY_TEMPLATE_ROWS + 1,
-            $rowNumber,
-            DailySalesTemplateColumns::PRODUCT_REFERENCE_SHEET,
-            DailySalesTemplateColumns::ENTRY_TEMPLATE_ROWS + 1,
+            $rowNumber, $ref, $max, $rowNumber, $ref, $max,
+            $rowNumber, $ref, $max, $rowNumber, $ref, $max,
         );
     }
 
+    /**
+     * Total amount: unit_price × quantity_sold (only when both present).
+     */
     protected function totalAmountFormula(int $rowNumber): string
     {
         return sprintf(
@@ -171,6 +194,8 @@ class SalesEntryLogSheetExport implements FromArray, ShouldAutoSize, WithEvents,
             $rowNumber,
         );
     }
+
+    // ─── Validation & protection ─────────────────────────────────────
 
     protected function applyDateValidation(Worksheet $sheet, int $highestRow): void
     {
@@ -204,20 +229,28 @@ class SalesEntryLogSheetExport implements FromArray, ShouldAutoSize, WithEvents,
         }
     }
 
+    /**
+     * Protection rules:
+     *
+     * EDITABLE (unlocked):  B (time), C (barcode), D (sku), G (quantity_sold), I (note)
+     * PROTECTED (locked):   A (date — pre-filled), E (product_name), F (unit_price), H (total_amount)
+     */
     protected function applyProtectionRules(Worksheet $sheet, int $highestRow): void
     {
         $sheet->getProtection()->setSheet(true);
 
-        foreach (['C', 'D', 'G', 'I'] as $column) {
-            $sheet->getStyle("{$column}2:{$column}{$highestRow}")
-                ->getProtection()
-                ->setLocked(Protection::PROTECTION_UNPROTECTED);
-        }
-
-        foreach (['E', 'F', 'H'] as $column) {
+        // Explicitly lock pre-filled/formula columns.
+        foreach (['A', 'E', 'F', 'H'] as $column) {
             $sheet->getStyle("{$column}2:{$column}{$highestRow}")
                 ->getProtection()
                 ->setLocked(Protection::PROTECTION_PROTECTED);
+        }
+
+        // Unlock editable columns: time, barcode, sku, quantity_sold, note.
+        foreach (['B', 'C', 'D', 'G', 'I'] as $column) {
+            $sheet->getStyle("{$column}2:{$column}{$highestRow}")
+                ->getProtection()
+                ->setLocked(Protection::PROTECTION_UNPROTECTED);
         }
     }
 
@@ -231,18 +264,25 @@ class SalesEntryLogSheetExport implements FromArray, ShouldAutoSize, WithEvents,
     protected function applyWorksheetGuidance(Worksheet $sheet): void
     {
         $sheet->mergeCells('J1:L1');
-        $sheet->mergeCells('J2:L4');
+        $sheet->mergeCells('J2:L6');
         $sheet->setCellValue('J1', 'Quick guide');
         $sheet->setCellValue(
             'J2',
-            "Enter one sale per row.\nFor time, press Ctrl+Shift+: in Excel to insert the current time as a fixed value.",
+            implode("\n", [
+                '• Scan barcode into column C',
+                '  OR type SKU into column D.',
+                '• Product name and price auto-fill.',
+                '• Enter quantity sold in column G.',
+                '• Total calculates automatically.',
+                '• For time: Ctrl+Shift+; in Excel.',
+            ]),
         );
 
         foreach (['J', 'K', 'L'] as $column) {
             $sheet->getColumnDimension($column)->setWidth(18);
         }
 
-        $sheet->getStyle('J1:L4')->applyFromArray([
+        $sheet->getStyle('J1:L6')->applyFromArray([
             'fill' => [
                 'fillType' => Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'FEF3C7'],
@@ -264,7 +304,7 @@ class SalesEntryLogSheetExport implements FromArray, ShouldAutoSize, WithEvents,
             ],
         ]);
 
-        $sheet->getStyle('J2:L4')->applyFromArray([
+        $sheet->getStyle('J2:L6')->applyFromArray([
             'alignment' => [
                 'wrapText' => true,
                 'vertical' => Alignment::VERTICAL_TOP,
