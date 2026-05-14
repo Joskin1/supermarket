@@ -1,170 +1,103 @@
-# Supermarket
+# White-Mart Inventory Management System
 
-Laravel 13 foundation for a supermarket inventory and sales system, with Filament as the primary admin interface.
+Welcome to the White-Mart Inventory Management System. This software provides a complete suite to manage stock, daily sales via Excel imports, low-stock alerts, and integrated barcode scanning, all running locally without the need for an active cloud subscription.
 
-## Stack
+This system is designed to run completely **offline** on any modern computer (Windows, macOS, or Linux) using **Docker Desktop**.
 
-- Laravel 13
-- Filament 5
-- Livewire 4 + Flux
-- Laravel Fortify for the existing frontend auth flow
-- Spatie Laravel Permission for roles and authorization
-- DDEV-managed Docker services for local development
+---
 
-## Local Development
+## 🛠 Requirements
 
-This project uses DDEV as its Docker layer. The repository already includes the required container configuration in [.ddev/config.yaml](/home/oluwadamilare/Code/supermarket/.ddev/config.yaml), so Phase 1 intentionally keeps DDEV instead of introducing a second `docker-compose.yml` workflow to maintain.
+To run this application on your computer, you only need one piece of software:
+- **Docker Desktop** (A tool that packages everything the app needs to run automatically)
 
-### Prerequisites
+### How to Install Docker Desktop:
+1. Go to [https://www.docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop)
+2. Download the version for your computer (Windows, Mac, or Linux).
+3. Run the installer and follow the simple on-screen instructions.
+4. Once installed, launch "Docker Desktop" and ensure it is running in the background.
 
-- Docker Desktop
-- DDEV
-- Node.js / npm
+---
 
-### Setup
+## 🚀 Quick Startup Guide
 
-```bash
-ddev start
-ddev composer install
-ddev npm install
-ddev exec php artisan migrate --seed
-ddev npm run build
-```
+We've made starting the application as simple as clicking a button. 
 
-### Useful Commands
+### For Windows Users:
+1. Open the folder where you placed the White-Mart files.
+2. Double-click the file named **`start.bat`**.
+3. A terminal window will open, start the services in the background, and automatically open your web browser to the system.
 
-```bash
-ddev exec php artisan migrate
-ddev exec php artisan db:seed
-ddev exec php artisan db:seed --class=InventoryDevelopmentSeeder
-ddev exec php artisan users:bootstrap-sudo owner@example.com --name="Store Owner" --password="replace-this-password"
-ddev exec php artisan queue:work --tries=1
-ddev exec php artisan test
-ddev npm run dev
-```
+### For Mac / Linux Users:
+1. Open the folder where you placed the White-Mart files.
+2. Double-click the file named **`start.sh`** (or run `./start.sh` in your terminal).
+3. The services will start in the background and open the system in your default browser.
 
-## Access
+> **Note on First Startup**: The very first time you start the system, it may take 1-2 minutes to automatically download the core components, create your database, and seed the default accounts. Please be patient. Subsequent starts will be almost instant.
 
-- App URL: `http://supermarket.test`
-- Filament admin: `http://supermarket.test/admin`
-- Mailpit: `http://supermarket.test:8025`
+---
 
-## Local Demo Credentials
+## 🔑 Default Login Credentials
 
-When `APP_ENV=local`, `php artisan migrate --seed` now provisions the full demo dataset automatically so you can exercise the whole system in development.
+Upon the very first launch, a default Administrator (Sudo) account is created for you:
 
-- `sudo`: `akinjoseph221@gmail.com` / `password`
-- `admin`: `store-manager@supermarket.test` / `password`
-- `admin`: `inventory-admin@supermarket.test` / `password`
-- `admin`: `sales-admin@supermarket.test` / `password`
+- **Email**: `whitemart@gmail.com`
+- **Password**: `whitemart@gmail.com`
 
-Login happens through Filament at `http://supermarket.test/admin/login`.
+> **IMPORTANT**: Once you log in for the first time, navigate to the User Management section and change this password immediately to secure your system.
 
-Seeded privileged users are email-verified for development. Two-factor authentication is currently disabled, so verified users can continue straight into the admin panel after login.
+---
 
-## Roles
+## 📊 Core Workflows Explained
 
-- `sudo`: unrestricted system access
-- `admin`: operational access for the supermarket owner
+### 1. The Offline Excel Sales Workflow
+To make end-of-day sales recording fast and resilient to internet outages, White-Mart uses a seamless Excel workflow:
+1. Navigate to the **Daily Sales Export** page and download the template for the day.
+2. The cashier can fill out the sales throughout the day offline using Excel. The sheet has a dropdown of all available products.
+3. At the end of the shift, upload the completed Excel sheet on the **Sales Imports** page.
+4. The system will automatically validate the rows, deduct the appropriate stock, and log the daily revenue.
 
-Only `sudo` users can manage users in Filament.
+### 2. Barcode & SKU Lookup
+The system supports barcode scanners. When adding a new product:
+1. Click the "Scan Barcode" button or focus on the Barcode field.
+2. Scan the physical item.
+3. If the item is unknown, the system will automatically query global databases (like OpenFoodFacts and UPCItemDB) over the internet to fetch the product name and category, saving you manual typing. If offline, you can manually enter the product details.
 
-Both `sudo` and `admin` users can access the inventory dashboard, categories, products, and stock entries.
+---
 
-## Inventory Workflow
+## 💾 Backups & Data Safety
 
-Phase 2 introduces the inventory core inside Filament:
+Your database and uploaded files (such as sales receipts and spreadsheets) are safely stored in persistent "Docker Volumes". This means even if you stop or restart your computer, your data is completely safe.
 
-- `Categories`: top-level product groupings such as Cosmetics, Toiletries, and Beverages
-- `Products`: create each sellable item once with SKU, prices, reorder level, and tracked current stock
-- `Stock Entries`: replenish an existing product by searching for it and adding new quantity
+### How to Create a Backup:
+1. Inside the app, navigate to the **Maintenance & Backups** page in the left sidebar.
+2. Click **Create Backup**.
+3. The system will bundle your entire database and settings into a single downloadable file. 
+4. Keep this file safe (e.g., on a USB drive or Google Drive) to protect against computer hardware failure.
 
-The intended operating flow is:
+---
 
-1. Create the product once in `Products`.
-2. Reuse that product in `Stock Entries` whenever more quantity is purchased.
-3. Optionally create a missing product inline from the Stock Entry form.
-4. Watch low-stock and out-of-stock states from the dashboard and product table.
+## 🔄 Update Workflow
 
-`current_stock` is stored on the `products` table for fast reads, while every replenishment remains preserved in `stock_entries` for history and future Excel-driven workflows.
+If you receive a new version of the White-Mart software from your development team:
+1. Download and extract the new files over your existing folder (replacing the old files).
+2. Open **Docker Desktop** and restart the "white-mart" environment.
+3. The system will automatically detect the updates, apply any new database changes, and start the app safely without losing any data.
 
-Stock corrections now belong in `Stock Adjustments`, which keeps a separate ledger for damage write-offs, shrinkage, and physical stock-count reconciliation without rewriting product history.
+---
 
-## Operational Trust Layer
+## 🩺 Troubleshooting
 
-The admin panel now includes:
+**Problem: The browser says "Site cannot be reached"**
+- Ensure Docker Desktop is open and running in the background.
+- Ensure you ran `start.bat` (Windows) or `start.sh` (Mac) and didn't close it prematurely.
 
-- `Stock Adjustments`: controlled inventory corrections and count reconciliation
-- `Activity Log`: read-only trace of critical inventory, sales import, backup, and settings events
-- `System Settings`: sudo-only business configuration
-- `Backups`: sudo-only business-data snapshot history and recovery tooling
+**Problem: Missing Database or "Connection Refused"**
+- This usually means Docker hasn't fully started the database service yet. Wait 30 seconds and refresh your browser.
 
-These features are intended for controlled operational use, not demo scaffolding.
+**Problem: Forgotten Password**
+- If you lose access to the Administrator account, ask your developer to run the `users:bootstrap-sudo` recovery command locally to reset your credentials.
 
-## Backup & Recovery
+---
 
-Create a private business-data snapshot with either of these entry points:
-
-```bash
-ddev exec php artisan backups:create --note="Before weekend close"
-```
-
-Or use the `Backups` page in Filament as a sudo user.
-
-Backup files are stored on the private local disk under `storage/app/private/backups/...` and tracked in the `backup_runs` table. Each snapshot is a JSON bundle of the first-party business tables plus metadata such as the business name, timezone, and generated timestamp.
-
-Important scope note:
-
-1. These snapshots cover business data only.
-2. They do not restore users, roles, permissions, sessions, jobs, failed jobs, cache state, or backup history.
-3. Historical user-linked fields are preserved when matching user records still exist; otherwise those references are restored as `null`.
-4. Keep a proper database/server backup strategy for full disaster recovery.
-
-For recovery planning:
-
-1. Keep the private backup files and the full database/server backup strategy under sudo control.
-2. Use the latest successful `backup_runs` record to identify the snapshot path and checksum.
-3. Restore into a clean environment when possible, then review system settings, privileged users, and the activity log before reopening operations.
-
-## Production Operations
-
-For real production use:
-
-1. Sales imports process immediately during upload so users can see successful and failed row totals before leaving the upload flow.
-2. Configure a real SMTP or API-based mail provider before creating or updating user accounts.
-3. Review the admin dashboard for production readiness alerts before go-live and after every environment change.
-
-## Development Inventory Seeder
-
-For realistic local data, run:
-
-```bash
-ddev exec php artisan db:seed --class=InventoryDevelopmentSeeder
-```
-
-In local development, `php artisan db:seed` already runs the same full demo dataset automatically. This explicit seeder remains useful when you want to repopulate the demo data into an existing local database without changing the environment.
-
-The demo dataset includes:
-
-- roles, sudo, and admin users
-- product categories and products
-- stock entries and stock adjustments
-- sales import batches, successes, and failures
-- reporting summaries
-- system settings
-- activity log data created through the real actions
-- a sample business-data recovery snapshot
-
-## Bootstrap Sudo User
-
-For non-local environments, create the first sudo user explicitly:
-
-```bash
-ddev exec php artisan users:bootstrap-sudo owner@example.com --name="Store Owner" --password="replace-this-password"
-```
-
-This keeps the default seed path safe while still giving the team a clear onboarding step for the first privileged account.
-
-## Auth Notes
-
-Fortify remains installed for the existing frontend login, password reset, and account settings flow. Public self-registration is disabled in this phase so user creation stays under sudo control in the Filament panel.
+*Engineered for performance, reliability, and ease of use. Copyright © White-Mart.*
