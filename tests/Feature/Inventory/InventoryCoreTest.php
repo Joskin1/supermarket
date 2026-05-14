@@ -4,12 +4,12 @@ namespace Tests\Feature\Inventory;
 
 use App\Actions\Inventory\CreateStockAdjustmentAction;
 use App\Actions\Inventory\CreateStockEntryAction;
-use App\Models\BarcodeLookupCache;
+use App\Models\BarcodeLookup;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\StockAdjustment;
 use App\Models\StockEntry;
-use App\Services\BarcodeProductLookupService;
+use App\Services\Barcode\BarcodeLookupService;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -137,11 +137,11 @@ class InventoryCoreTest extends TestCase
             'sku' => 'COS-PERF-ZARA-50',
         ]);
 
-        $result = app(BarcodeProductLookupService::class)->find('012345678905');
+        $result = app(BarcodeLookupService::class)->lookup('012345678905');
 
-        $this->assertSame('local', $result['source']);
-        $this->assertSame($product->id, $result['product_id']);
-        $this->assertSame($product->sku, $result['sku']);
+        $this->assertTrue($result->isLocal());
+        $this->assertSame($product->id, $result->product?->id);
+        $this->assertSame($product->name, $result->productName);
         Http::assertNothingSent();
     }
 
@@ -153,29 +153,29 @@ class InventoryCoreTest extends TestCase
                 'product' => [
                     'product_name' => 'Imported Cereal',
                     'brands' => 'Breakfast Co',
-                    'categories' => 'Cereals',
+                    'categories_tags' => ['en:cereals'],
                 ],
             ]),
         ]);
 
-        $result = app(BarcodeProductLookupService::class)->find('0099999999999');
+        $result = app(BarcodeLookupService::class)->lookup('0099999999999');
 
-        $this->assertSame('external', $result['source']);
-        $this->assertSame('open_food_facts', $result['provider']);
-        $this->assertSame('Imported Cereal', $result['product_name']);
+        $this->assertTrue($result->isFromApi());
+        $this->assertSame('openfoodfacts', $result->apiProvider);
+        $this->assertSame('Imported Cereal', $result->productName);
 
-        $this->assertDatabaseHas('barcode_lookup_caches', [
+        $this->assertDatabaseHas('barcode_lookups', [
             'barcode' => '0099999999999',
-            'provider' => 'open_food_facts',
+            'source' => 'openfoodfacts',
             'product_name' => 'Imported Cereal',
         ]);
 
         Http::fake();
 
-        $cached = app(BarcodeProductLookupService::class)->find('0099999999999');
+        $cached = app(BarcodeLookupService::class)->lookup('0099999999999');
 
-        $this->assertSame('external', $cached['source']);
-        $this->assertSame(1, BarcodeLookupCache::query()->count());
+        $this->assertTrue($cached->isCached());
+        $this->assertSame(1, BarcodeLookup::query()->count());
         Http::assertNothingSent();
     }
 
