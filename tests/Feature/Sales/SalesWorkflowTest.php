@@ -125,8 +125,11 @@ class SalesWorkflowTest extends TestCase
         $this->assertSame('2026-04-10', $sheet?->getCell('A2')->getFormattedValue());
         $this->assertSame('time', $sheet?->getCell('B1')->getValue());
         $this->assertNull($sheet?->getCell('B2')->getValue());
-        $this->assertStringStartsWith('=IF($C2=', (string) $sheet?->getCell('D2')->getValue());
-        $this->assertStringContainsString('MATCH($C2', (string) $sheet?->getCell('D2')->getValue());
+
+        // D2 (SKU) is a plain editable cell — no formula.
+        $this->assertNull($sheet?->getCell('D2')->getValue());
+
+        // E2 (product_name) and F2 (unit_price) have dual-lookup formulas.
         $this->assertStringStartsWith('=IF($C2<>', (string) $sheet?->getCell('E2')->getValue());
         $this->assertStringContainsString('MATCH($C2', (string) $sheet?->getCell('E2')->getValue());
         $this->assertStringContainsString('MATCH($D2', (string) $sheet?->getCell('E2')->getValue());
@@ -134,15 +137,23 @@ class SalesWorkflowTest extends TestCase
         $this->assertStringContainsString('MATCH($C2', (string) $sheet?->getCell('F2')->getValue());
         $this->assertStringContainsString('MATCH($D2', (string) $sheet?->getCell('F2')->getValue());
         $this->assertStringStartsWith('=IF(OR($F2=', (string) $sheet?->getCell('H2')->getValue());
+
+        // Worksheet protection is enabled.
         $this->assertTrue($sheet?->getProtection()->getSheet());
+
+        // Locked columns: A (date), E (product_name), F (unit_price), H (total_amount).
+        $this->assertSame(Protection::PROTECTION_PROTECTED, $sheet?->getStyle('A2')->getProtection()->getLocked());
+        $this->assertSame(Protection::PROTECTION_PROTECTED, $sheet?->getStyle('E2')->getProtection()->getLocked());
+        $this->assertSame(Protection::PROTECTION_PROTECTED, $sheet?->getStyle('F2')->getProtection()->getLocked());
+        $this->assertSame(Protection::PROTECTION_PROTECTED, $sheet?->getStyle('H2')->getProtection()->getLocked());
+
+        // Unlocked columns: B (time), C (barcode), D (sku), G (quantity), I (note).
+        $this->assertSame(Protection::PROTECTION_UNPROTECTED, $sheet?->getStyle('B2')->getProtection()->getLocked());
         $this->assertSame(Protection::PROTECTION_UNPROTECTED, $sheet?->getStyle('C2')->getProtection()->getLocked());
         $this->assertSame(Protection::PROTECTION_UNPROTECTED, $sheet?->getStyle('D2')->getProtection()->getLocked());
         $this->assertSame(Protection::PROTECTION_UNPROTECTED, $sheet?->getStyle('G2')->getProtection()->getLocked());
         $this->assertSame(Protection::PROTECTION_UNPROTECTED, $sheet?->getStyle('I2')->getProtection()->getLocked());
-        $this->assertSame(Protection::PROTECTION_PROTECTED, $sheet?->getStyle('E2')->getProtection()->getLocked());
-        $this->assertSame(Protection::PROTECTION_PROTECTED, $sheet?->getStyle('F2')->getProtection()->getLocked());
-        $this->assertSame(Protection::PROTECTION_PROTECTED, $sheet?->getStyle('H2')->getProtection()->getLocked());
-        $this->assertStringContainsString('Ctrl+Shift+:', (string) $sheet?->getCell('J2')->getValue());
+        $this->assertStringContainsString('Ctrl+Shift+', (string) $sheet?->getCell('J2')->getValue());
     }
 
     public function test_sales_import_batch_is_created_and_processed_from_an_uploaded_workbook(): void
@@ -367,7 +378,9 @@ class SalesWorkflowTest extends TestCase
         $sheet?->setCellValue('C2', $product->barcode);
         $sheet?->setCellValue('G2', 2);
 
-        foreach (['D3', 'E3', 'F3', 'H3'] as $coordinate) {
+        // Simulate stale cached formula values on untouched rows (E3, F3, H3 are formulas).
+        // D3 is plain text now — no formula to cache.
+        foreach (['E3', 'F3', 'H3'] as $coordinate) {
             $sheet?->getCell($coordinate)->setCalculatedValue(0);
         }
 
@@ -592,7 +605,8 @@ class SalesWorkflowTest extends TestCase
         $spreadsheet = $this->loadSpreadsheetFromBinary($binary);
         $sheet = $spreadsheet->getSheetByName(DailySalesTemplateColumns::SALES_ENTRY_LOG_SHEET);
 
-        foreach (['D2', 'E2', 'F2', 'H2'] as $coordinate) {
+        // Only formula cells can have stale cached values — D is now plain text.
+        foreach (['E2', 'F2', 'H2'] as $coordinate) {
             $sheet?->getCell($coordinate)->setCalculatedValue(0);
         }
 
