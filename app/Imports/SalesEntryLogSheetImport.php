@@ -43,15 +43,14 @@ class SalesEntryLogSheetImport implements OnEachRow, WithChunkReading, WithHeadi
         $worksheet = $spreadsheetRow->getWorksheet();
         $rowNumber = $spreadsheetRow->getRowIndex();
 
-        foreach (['C', 'G', 'I'] as $column) {
+        // Check all editable columns: C (barcode), D (sku), G (quantity_sold), I (note).
+        foreach (['C', 'D', 'G', 'I'] as $column) {
             if (filled($worksheet->getCell("{$column}{$rowNumber}")->getValue())) {
                 return true;
             }
         }
 
-        $skuCell = $worksheet->getCell("D{$rowNumber}");
-
-        return (! $skuCell->isFormula()) && filled($skuCell->getValue());
+        return false;
     }
 
     public function chunkSize(): int
@@ -84,8 +83,9 @@ class SalesEntryLogSheetImport implements OnEachRow, WithChunkReading, WithHeadi
         $spreadsheetRow = $row->getDelegate();
         $rowNumber = $spreadsheetRow->getRowIndex();
 
+        // Resolve formula cells: E (product_name), F (unit_price), H (total_amount).
+        // Columns C (barcode) and D (sku) are now plain text — no formula resolution needed.
         foreach ([
-            'D' => 'sku',
             'E' => 'product_name',
             'F' => 'unit_price',
             'H' => 'total_amount',
@@ -117,8 +117,9 @@ class SalesEntryLogSheetImport implements OnEachRow, WithChunkReading, WithHeadi
             return $fallback;
         }
 
+        // Formula cells with no user input should return null.
         if (
-            in_array($field, ['sku', 'product_name', 'unit_price'], true)
+            in_array($field, ['product_name', 'unit_price'], true)
             && blank($rowData['barcode'] ?? null)
             && blank($rowData['sku'] ?? null)
         ) {
@@ -138,7 +139,7 @@ class SalesEntryLogSheetImport implements OnEachRow, WithChunkReading, WithHeadi
         $calculatedValue = $cell->getOldCalculatedValue();
 
         if (
-            in_array($field, ['sku', 'product_name', 'unit_price', 'total_amount'], true)
+            in_array($field, ['product_name', 'unit_price', 'total_amount'], true)
             && (
                 $calculatedValue === 0
                 || $calculatedValue === '0'
