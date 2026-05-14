@@ -72,10 +72,12 @@ class ProductForm
                         ->maxLength(255)
                         ->unique(ignoreRecord: true),
                     TextInput::make('sku')
-                        ->required()
                         ->maxLength(255)
-                        ->unique(ignoreRecord: true)
-                        ->dehydrateStateUsing(static fn (?string $state): ?string => filled($state) ? Str::upper(trim($state)) : null),
+                        ->disabled()
+                        ->dehydrated(false)
+                        ->helperText(fn (?Product $record): string => $record?->sku
+                            ? 'Auto-generated: '.$record->sku
+                            : 'Will be auto-generated on save (e.g. SM-260507-X7K2).'),
                     TextInput::make('barcode')
                         ->label('Barcode')
                         ->maxLength(255)
