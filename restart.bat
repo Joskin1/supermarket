@@ -2,7 +2,7 @@
 setlocal
 
 echo ====================================================
-echo      White-Mart Inventory System Startup
+echo      White-Mart Inventory System Restart
 echo ====================================================
 echo.
 
@@ -10,18 +10,20 @@ echo.
 docker info >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Docker is not running or not installed.
-    echo Please install Docker Desktop and ensure it is running before starting White-Mart.
     echo Press any key to exit...
     pause >nul
     exit /b 1
 )
 
-echo [INFO] Docker is running. Building and starting White-Mart services...
+echo [INFO] Stopping current White-Mart services...
+docker compose down
+
+echo.
+echo [INFO] Building and starting White-Mart services...
 docker compose up -d --build
 
 echo.
 echo [INFO] Waiting for services to initialize...
-echo [INFO] This might take a few minutes on the first run as images are built and databases are initialized.
 timeout /t 15 /nobreak >nul
 
 echo.
@@ -30,14 +32,8 @@ start http://localhost
 
 echo.
 echo ====================================================
-echo      White-Mart is now running in the background!
-echo.
-echo      Default Admin Login:
-echo      Email: admin@white-mart.local
-echo      Password: password
-echo.
+echo      White-Mart has been restarted!
 echo      You can safely close this window.
-echo      To stop the system, run stop.bat
 echo ====================================================
 echo Press any key to exit...
 pause >nul

@@ -144,6 +144,10 @@ if [ "${WHITE_MART_SKIP_INIT:-false}" != "true" ]; then
         log "First time initialization: Running migrations and seeders."
         php artisan migrate --force --no-interaction
         php artisan db:seed --force --no-interaction
+        
+        log "Bootstrapping sudo user for local access."
+        php artisan users:bootstrap-sudo admin@white-mart.local --name="System Admin" --password="password" --no-interaction || true
+        
         touch storage/app/.init_complete
     else
         log "Database already initialized. Running any pending migrations."

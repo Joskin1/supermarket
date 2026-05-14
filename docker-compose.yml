@@ -10,7 +10,7 @@ services:
         NODE_VERSION: "22"
         FLUX_USERNAME: "${FLUX_USERNAME:-}"
         FLUX_LICENSE_KEY: "${FLUX_LICENSE_KEY:-}"
-    image: white-mart/app:local
+    container_name: white-mart-app
     restart: unless-stopped
     depends_on:
       mysql:
@@ -45,6 +45,12 @@ services:
       - app_storage:/var/www/html/storage
     networks:
       - white_mart
+    healthcheck:
+      test: ["CMD-SHELL", "white-mart-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   nginx:
     build:
@@ -56,7 +62,7 @@ services:
         NODE_VERSION: "22"
         FLUX_USERNAME: "${FLUX_USERNAME:-}"
         FLUX_LICENSE_KEY: "${FLUX_LICENSE_KEY:-}"
-    image: white-mart/nginx:local
+    container_name: white-mart-nginx
     restart: unless-stopped
     depends_on:
       app:
@@ -76,6 +82,7 @@ services:
 
   mysql:
     image: mysql:8.0
+    container_name: white-mart-mysql
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: "${DOCKER_DB_DATABASE:-white_mart}"
@@ -100,6 +107,7 @@ services:
 
   phpmyadmin:
     image: phpmyadmin:5-apache
+    container_name: white-mart-phpmyadmin
     profiles:
       - tools
     restart: unless-stopped
