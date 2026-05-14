@@ -28,7 +28,7 @@ class DevelopmentSeederTest extends TestCase
 
         $this->seed(ApplicationDemoSeeder::class);
 
-        $sudo = User::query()->where('email', 'akinjoseph221@gmail.com')->first();
+        $sudo = User::query()->where('email', env('DEMO_SUDO_EMAIL', env('SUDO_EMAIL', 'demo-sudo@white-mart.test')))->first();
 
         $this->assertNotNull($sudo);
         $this->assertTrue($sudo->isSudo());
