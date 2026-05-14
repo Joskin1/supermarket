@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\SalesImportBatches\Pages;
 
 use App\Actions\Sales\CreateSalesImportBatchAction;
-use App\Actions\Sales\QueueSalesImportBatchAction;
+use App\Actions\Sales\ProcessSalesImportAction;
 use App\Enums\SalesImportBatchStatus;
 use App\Filament\Resources\SalesImportBatches\SalesImportBatchResource;
 use App\Models\SalesImportBatch;
@@ -30,9 +30,7 @@ class CreateSalesImportBatch extends CreateRecord
             'notes' => $data['notes'] ?? null,
         ]);
 
-        app(QueueSalesImportBatchAction::class)->execute($batch);
-
-        return $batch->fresh('uploader');
+        return app(ProcessSalesImportAction::class)->execute($batch);
     }
 
     protected function getRedirectUrl(): string
@@ -50,14 +48,14 @@ class CreateSalesImportBatch extends CreateRecord
             SalesImportBatchStatus::PROCESSED_WITH_FAILURES => 'Sales file imported with some failed rows.',
             SalesImportBatchStatus::FAILED => 'Sales file could not be imported cleanly.',
             SalesImportBatchStatus::PROCESSING => 'Sales file is processing.',
-            SalesImportBatchStatus::UPLOADED => 'Sales file queued for processing.',
+            SalesImportBatchStatus::UPLOADED => 'Sales file upload received.',
             default => 'Sales file upload received.',
         };
 
         $notification = Notification::make()
             ->title($title)
             ->body(match ($batch->status) {
-                SalesImportBatchStatus::UPLOADED => "Batch {$batch->batch_code} has been queued. Open the batch to monitor validation results and processed totals.",
+                SalesImportBatchStatus::UPLOADED => "Batch {$batch->batch_code} was uploaded, but processing did not start.",
                 SalesImportBatchStatus::PROCESSING => "Batch {$batch->batch_code} is processing now. Refresh the batch page shortly for the final totals.",
                 default => "Batch {$batch->batch_code}: {$batch->successful_rows} successful rows, {$batch->failed_rows} failed rows.",
             });

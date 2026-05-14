@@ -130,7 +130,7 @@ For recovery planning:
 
 For real production use:
 
-1. Run a queue worker continuously so sales imports process in the background instead of inside web requests.
+1. Sales imports process immediately during upload so users can see successful and failed row totals before leaving the upload flow.
 2. Configure a real SMTP or API-based mail provider before creating or updating user accounts.
 3. Review the admin dashboard for production readiness alerts before go-live and after every environment change.
 

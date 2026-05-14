@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\SalesImportBatches\Pages;
 
 use App\Actions\Sales\ExportDailySalesTemplateAction;
-use App\Actions\Sales\QueueSalesImportBatchAction;
+use App\Actions\Sales\ProcessSalesImportAction;
 use App\Enums\SalesImportBatchStatus;
 use App\Filament\Resources\SalesImportBatches\SalesImportBatchResource;
 use Filament\Actions\Action;
@@ -26,13 +26,25 @@ class ViewSalesImportBatch extends ViewRecord
                     SalesImportBatchStatus::FAILED,
                 ], true))
                 ->action(function (): void {
-                    app(QueueSalesImportBatchAction::class)->execute($this->getRecord());
+                    $batch = app(ProcessSalesImportAction::class)->execute($this->getRecord());
 
-                    Notification::make()
-                        ->success()
-                        ->title('Batch re-queued')
-                        ->body('The sales import batch has been queued for processing again.')
-                        ->send();
+                    $notification = Notification::make()
+                        ->title(match ($batch->status) {
+                            SalesImportBatchStatus::PROCESSED => 'Batch imported successfully.',
+                            SalesImportBatchStatus::PROCESSED_WITH_FAILURES => 'Batch imported with some failed rows.',
+                            SalesImportBatchStatus::FAILED => 'Batch could not be imported cleanly.',
+                            default => 'Batch processing finished.',
+                        })
+                        ->body("Batch {$batch->batch_code}: {$batch->successful_rows} successful rows, {$batch->failed_rows} failed rows.");
+
+                    $notification = match ($batch->status) {
+                        SalesImportBatchStatus::PROCESSED => $notification->success(),
+                        SalesImportBatchStatus::PROCESSED_WITH_FAILURES => $notification->warning(),
+                        SalesImportBatchStatus::FAILED => $notification->danger(),
+                        default => $notification->info(),
+                    };
+
+                    $notification->send();
                 }),
             Action::make('download_template')
                 ->label('Download Template')
