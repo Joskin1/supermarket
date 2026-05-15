@@ -1,15 +1,25 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
 echo ====================================================
 echo      White-Mart Inventory System Restart
 echo ====================================================
 echo.
 
-:: Check if Docker is installed and running
+:: Check if Docker is installed
+where docker >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] Docker is not installed or not in PATH.
+    echo Press any key to exit...
+    pause >nul
+    exit /b 1
+)
+
+:: Check if Docker engine is running
 docker info >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [ERROR] Docker is not running or not installed.
+    echo [INFO] Docker is not running.
+    echo Please run start.bat to initialize the system properly.
     echo Press any key to exit...
     pause >nul
     exit /b 1
@@ -24,7 +34,7 @@ docker compose up -d --build
 
 echo.
 echo [INFO] Waiting for services to initialize...
-timeout /t 15 /nobreak >nul
+timeout /t 10 /nobreak >nul
 
 echo.
 echo [INFO] Opening White-Mart in your default web browser...

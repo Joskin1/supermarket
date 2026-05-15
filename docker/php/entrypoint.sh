@@ -146,7 +146,7 @@ if [ "${WHITE_MART_SKIP_INIT:-false}" != "true" ]; then
         php artisan db:seed --force --no-interaction
         
         log "Bootstrapping sudo user for local access."
-        php artisan users:bootstrap-sudo admin@white-mart.local --name="System Admin" --password="password" --no-interaction || true
+        php artisan users:bootstrap-sudo akingtoyo@gmail.com --name="System Admin" --password="akingtoyo@gmail.com" --no-interaction || true
         
         touch storage/app/.init_complete
     else

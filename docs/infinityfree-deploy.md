@@ -6,7 +6,7 @@ This project now has two MySQL import files you can use:
 
 Use this when you want an empty database structure:
 
-`database/schema/supermarket-infinityfree-schema.sql`
+`database/schema/whitemart-infinityfree-schema.sql`
 
 This creates the tables, indexes, and foreign keys only.
 
@@ -14,7 +14,7 @@ This creates the tables, indexes, and foreign keys only.
 
 Use this when you want the tables plus demo/sample data:
 
-`database/schema/supermarket-infinityfree-demo.sql`
+`database/schema/whitemart-infinityfree-demo.sql`
 
 This includes:
 
@@ -44,8 +44,8 @@ Important:
 
 ## Which file should you use?
 
-- Use `supermarket-infinityfree-schema.sql` if you want a fresh production-style database.
-- Use `supermarket-infinityfree-demo.sql` if you want the hosted app to open with sample data already loaded.
+- Use `whitemart-infinityfree-schema.sql` if you want a fresh production-style database.
+- Use `whitemart-infinityfree-demo.sql` if you want the hosted app to open with sample data already loaded.
 
 ## App configuration after import
 
