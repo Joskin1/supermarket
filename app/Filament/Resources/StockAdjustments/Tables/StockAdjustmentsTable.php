@@ -10,6 +10,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Builder;
 
 class StockAdjustmentsTable
@@ -17,7 +18,7 @@ class StockAdjustmentsTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->query(fn (): Builder => StockAdjustment::query()->with(['product.category', 'adjuster']))
+            ->query(fn(): Builder => StockAdjustment::query()->with(['product.category', 'adjuster']))
             ->defaultSort('adjustment_date', 'desc')
             ->columns([
                 TextColumn::make('adjustment_date')
@@ -36,10 +37,10 @@ class StockAdjustmentsTable
                     ->state(function (StockAdjustment $record): string {
                         $value = (int) $record->quantity_change;
 
-                        return $value > 0 ? '+'.number_format($value) : number_format($value);
+                        return $value > 0 ? '+' . number_format($value) : number_format($value);
                     })
                     ->badge()
-                    ->color(fn (StockAdjustment $record): string => $record->quantity_change >= 0 ? 'success' : 'danger')
+                    ->color(fn(StockAdjustment $record): string => $record->quantity_change >= 0 ? 'success' : 'danger')
                     ->sortable(),
                 TextColumn::make('previous_stock')
                     ->label('Previous')
@@ -52,6 +53,9 @@ class StockAdjustmentsTable
                     ->sortable(),
                 TextColumn::make('reason')
                     ->wrap()
+                    ->searchable(),
+                TextColumn::make('note')
+                    ->limit(50)
                     ->searchable(),
                 TextColumn::make('adjuster.name')
                     ->label('Adjusted by')
@@ -75,16 +79,16 @@ class StockAdjustmentsTable
                         return $query
                             ->when(
                                 $data['adjusted_from'] ?? null,
-                                fn (Builder $query, string $date): Builder => $query->whereDate('adjustment_date', '>=', $date),
+                                fn(Builder $query, string $date): Builder => $query->whereDate('adjustment_date', '>=', $date),
                             )
                             ->when(
                                 $data['adjusted_until'] ?? null,
-                                fn (Builder $query, string $date): Builder => $query->whereDate('adjustment_date', '<=', $date),
+                                fn(Builder $query, string $date): Builder => $query->whereDate('adjustment_date', '<=', $date),
                             );
                     }),
                 SelectFilter::make('category_id')
                     ->label('Category')
-                    ->options(fn (): array => Category::query()
+                    ->options(fn(): array => Category::query()
                         ->orderBy('name')
                         ->pluck('name', 'id')
                         ->all())
@@ -92,19 +96,19 @@ class StockAdjustmentsTable
                     ->query(function (Builder $query, array $data): Builder {
                         return $query->when(
                             $data['value'] ?? null,
-                            fn (Builder $query, int|string $categoryId): Builder => $query->whereHas(
+                            fn(Builder $query, int|string $categoryId): Builder => $query->whereHas(
                                 'product',
-                                fn (Builder $productQuery): Builder => $productQuery->where('category_id', $categoryId),
+                                fn(Builder $productQuery): Builder => $productQuery->where('category_id', $categoryId),
                             ),
                         );
                     }),
                 SelectFilter::make('product_id')
                     ->label('Product')
-                    ->options(fn (): array => Product::query()
+                    ->options(fn(): array => Product::query()
                         ->orderBy('name')
                         ->get()
-                        ->mapWithKeys(fn (Product $product): array => [
-                            $product->id => trim($product->name.' ('.$product->sku.')'),
+                        ->mapWithKeys(fn(Product $product): array => [
+                            $product->id => trim($product->name . ' (' . $product->sku . ')'),
                         ])
                         ->all())
                     ->searchable(),

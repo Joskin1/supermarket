@@ -1,7 +1,6 @@
 <?php
 
 namespace App\Imports;
-
 use App\Models\SalesImportBatch;
 use App\Support\SalesImport\DailySalesTemplateColumns;
 use App\Support\SalesImport\SalesImportRowProcessor;
@@ -9,7 +8,6 @@ use Maatwebsite\Excel\Concerns\OnEachRow;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Row;
-use PhpOffice\PhpSpreadsheet\Cell\Cell as SpreadsheetCell;
 
 class SalesEntryLogSheetImport implements OnEachRow, WithChunkReading, WithHeadingRow
 {
@@ -24,11 +22,11 @@ class SalesEntryLogSheetImport implements OnEachRow, WithChunkReading, WithHeadi
             return;
         }
 
-        if (! $this->rowHasEditableInput($row)) {
+        $rowData = $this->extractRowData($row);
+
+        if (! $this->rowHasEditableInput($rowData)) {
             return;
         }
-
-        $rowData = $this->extractRowData($row);
 
         if ($this->shouldSkipRow($rowData)) {
             return;
@@ -37,20 +35,12 @@ class SalesEntryLogSheetImport implements OnEachRow, WithChunkReading, WithHeadi
         $this->rowProcessor->process($this->batch, $rowData, $row->getIndex());
     }
 
-    protected function rowHasEditableInput(Row $row): bool
+    protected function rowHasEditableInput(array $rowData): bool
     {
-        $spreadsheetRow = $row->getDelegate();
-        $worksheet = $spreadsheetRow->getWorksheet();
-        $rowNumber = $spreadsheetRow->getRowIndex();
-
-        // Check all editable columns: C (barcode), D (sku), G (quantity_sold), I (note).
-        foreach (['C', 'D', 'G', 'I'] as $column) {
-            if (filled($worksheet->getCell("{$column}{$rowNumber}")->getValue())) {
-                return true;
-            }
-        }
-
-        return false;
+        return filled($rowData['barcode'] ?? null)
+            || filled($rowData['sku'] ?? null)
+            || filled($rowData['quantity_sold'] ?? null)
+            || filled($rowData['note'] ?? null);
     }
 
     public function chunkSize(): int
@@ -80,75 +70,26 @@ class SalesEntryLogSheetImport implements OnEachRow, WithChunkReading, WithHeadi
     {
         /** @var array<string, mixed> $rowData */
         $rowData = $row->toArray(null, false, true, 'I');
-        $spreadsheetRow = $row->getDelegate();
-        $rowNumber = $spreadsheetRow->getRowIndex();
 
-        // Resolve formula cells: E (product_name), F (unit_price), H (total_amount).
-        // Columns C (barcode) and D (sku) are now plain text — no formula resolution needed.
-        foreach ([
-            'E' => 'product_name',
-            'F' => 'unit_price',
-            'H' => 'total_amount',
-        ] as $column => $key) {
-            $cell = $spreadsheetRow->getWorksheet()->getCell("{$column}{$rowNumber}");
-            $rowData[$key] = $this->resolveCellValue(
-                $cell,
-                $rowData[$key] ?? null,
-                $key,
-                $rowData,
-            );
+        // If it's an untouched formula row (no barcode, no sku), nullify the formula fields
+        if (blank($rowData['barcode'] ?? null) && blank($rowData['sku'] ?? null)) {
+            $rowData['product_name'] = null;
+            $rowData['unit_price'] = null;
+            $rowData['total_amount'] = null;
+        }
+
+        if (blank($rowData['quantity_sold'] ?? null)) {
+            $rowData['total_amount'] = null;
+        }
+
+        // Clean up 0s or errors that formulas might leave behind.
+        foreach (['product_name', 'unit_price', 'total_amount'] as $key) {
+            $val = $rowData[$key] ?? null;
+            if ($val === 0 || $val === '0' || (is_string($val) && str_starts_with($val, '#'))) {
+                $rowData[$key] = null;
+            }
         }
 
         return $rowData;
-    }
-
-    /**
-     * Treat reference formulas as blank when the user has not started the row.
-     *
-     * @param  array<string, mixed>  $rowData
-     */
-    protected function resolveCellValue(
-        SpreadsheetCell $cell,
-        mixed $fallback,
-        string $field,
-        array $rowData,
-    ): mixed {
-        if (! $cell->isFormula()) {
-            return $fallback;
-        }
-
-        // Formula cells with no user input should return null.
-        if (
-            in_array($field, ['product_name', 'unit_price'], true)
-            && blank($rowData['barcode'] ?? null)
-            && blank($rowData['sku'] ?? null)
-        ) {
-            return null;
-        }
-
-        if (
-            $field === 'total_amount'
-            && (
-                (blank($rowData['barcode'] ?? null) && blank($rowData['sku'] ?? null))
-                || blank($rowData['quantity_sold'] ?? null)
-            )
-        ) {
-            return null;
-        }
-
-        $calculatedValue = $cell->getOldCalculatedValue();
-
-        if (
-            in_array($field, ['product_name', 'unit_price', 'total_amount'], true)
-            && (
-                $calculatedValue === 0
-                || $calculatedValue === '0'
-                || (is_string($calculatedValue) && str_starts_with($calculatedValue, '#'))
-            )
-        ) {
-            return null;
-        }
-
-        return $calculatedValue;
     }
 }
