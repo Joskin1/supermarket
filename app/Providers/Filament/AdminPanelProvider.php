@@ -41,6 +41,10 @@ class AdminPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Emerald,
             ])
+            ->renderHook(
+                \Filament\View\PanelsRenderHook::SIDEBAR_FOOTER,
+                fn (): string => \Illuminate\Support\Facades\Blade::render("@livewire('version-footer')")
+            )
             ->navigationGroups([
                 NavigationGroup::make('Inventory'),
                 NavigationGroup::make('Sales'),

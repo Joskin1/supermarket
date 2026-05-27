@@ -5,12 +5,8 @@ namespace App\Filament\Pages;
 use Filament\Pages\Page;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Cache;
 use Native\Desktop\Facades\AutoUpdater;
-use Native\Desktop\Events\AutoUpdater\UpdateAvailable;
-use Native\Desktop\Events\AutoUpdater\UpdateNotAvailable;
-use Native\Desktop\Events\AutoUpdater\UpdateDownloaded;
-use Native\Desktop\Events\AutoUpdater\Error as UpdaterError;
-use Illuminate\Support\Facades\Event;
 
 class SystemUpdate extends Page
 {
@@ -22,12 +18,10 @@ class SystemUpdate extends Page
     public string $currentVersion;
     public bool $isDesktop;
 
-    public function mount()
+    public function mount(): void
     {
         $this->isDesktop = (bool) env('NATIVEPHP_RUNNING', false);
         $this->currentVersion = config('nativephp.version', '1.0.0');
-
-        $this->registerUpdateListeners();
     }
 
     public static function canAccess(): bool
@@ -36,86 +30,97 @@ class SystemUpdate extends Page
         return $user && ($user->isSudo() || $user->isAdmin());
     }
 
-    protected function registerUpdateListeners()
+    public function getUpdateStatusProperty(): string
     {
-        if (! $this->isDesktop) return;
-
-        Event::listen(UpdateAvailable::class, function () {
-            Notification::make()
-                ->title('Update Available!')
-                ->body('A new version is available. Downloading in the background...')
-                ->info()
-                ->send();
-        });
-
-        Event::listen(UpdateNotAvailable::class, function () {
-            Notification::make()
-                ->title('Up to Date')
-                ->body('You are running the latest version.')
-                ->success()
-                ->send();
-        });
-
-        Event::listen(UpdaterError::class, function ($event) {
-            Notification::make()
-                ->title('Update Failed')
-                ->body('An error occurred: ' . ($event->message ?? 'Unknown error'))
-                ->danger()
-                ->send();
-        });
-
-        Event::listen(UpdateDownloaded::class, function () {
-            Notification::make()
-                ->title('Update Ready')
-                ->body('The update has been downloaded and is ready to install.')
-                ->success()
-                ->actions([
-                    \Filament\Notifications\Actions\Action::make('install')
-                        ->label('Install & Restart')
-                        ->button()
-                        ->action(function () {
-                            AutoUpdater::quitAndInstall();
-                        })
-                ])
-                ->persistent()
-                ->send();
-        });
+        return Cache::get('update_download_status', 'idle');
     }
 
-    protected function getHeaderActions(): array
+    public function getLatestVersionProperty(): ?string
     {
-        return [
-            Action::make('check_updates')
-                ->label('Check for Updates')
-                ->icon('heroicon-o-cloud-arrow-down')
-                ->color('primary')
-                ->visible(fn () => $this->isDesktop)
-                ->action(function () {
-                    try {
-                        Notification::make()
-                            ->title('Checking for updates...')
-                            ->info()
-                            ->send();
-                            
-                        AutoUpdater::checkForUpdates();
-                    } catch (\Exception $e) {
-                        Notification::make()
-                            ->title('Update Check Failed')
-                            ->body($e->getMessage())
-                            ->danger()
-                            ->send();
-                    }
-                }),
+        return Cache::get('latest_version_available');
+    }
+
+    public function getDownloadProgressProperty(): int
+    {
+        return Cache::get('update_download_progress', 0);
+    }
+
+    public function checkUpdates(): void
+    {
+        if (! $this->isDesktop) {
+            return;
+        }
+
+        try {
+            Notification::make()
+                ->title('Checking for updates...')
+                ->info()
+                ->send();
                 
-            Action::make('restart_app')
-                ->label('Restart Application')
-                ->icon('heroicon-o-power')
-                ->color('warning')
-                ->visible(fn () => $this->isDesktop)
-                ->requiresConfirmation()
-                ->action(function () {
-                    AutoUpdater::quitAndInstall();
-                }),
-        ];
+            AutoUpdater::checkForUpdates();
+        } catch (\Throwable $e) {
+            Notification::make()
+                ->title('Update Check Failed')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function startDownload(): void
+    {
+        if (! $this->isDesktop) {
+            return;
+        }
+
+        try {
+            Cache::put('update_download_status', 'downloading');
+            Cache::put('update_download_progress', 0);
+
+            AutoUpdater::downloadUpdate();
+
+            Notification::make()
+                ->title('Download Started')
+                ->body('The update is downloading in the background. You can monitor progress here or in the sidebar.')
+                ->success()
+                ->send();
+        } catch (\Throwable $e) {
+            Cache::put('update_download_status', 'available');
+            
+            Notification::make()
+                ->title('Download Failed')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function installUpdate(): void
+    {
+        if (! $this->isDesktop) {
+            return;
+        }
+
+        try {
+            AutoUpdater::quitAndInstall();
+        } catch (\Throwable $e) {
+            Notification::make()
+                ->title('Installation Failed')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function resetUpdateState(): void
+    {
+        Cache::put('update_download_status', 'idle');
+        Cache::forget('latest_version_available');
+        Cache::forget('update_download_progress');
+
+        Notification::make()
+            ->title('Update state reset completed.')
+            ->info()
+            ->send();
     }
 }

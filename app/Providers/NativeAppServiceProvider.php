@@ -27,6 +27,8 @@ class NativeAppServiceProvider implements ProvidesPhpIni
         $this->registerShortcutListeners();
         $this->bootstrapProductionDatabase();
         $this->cacheApplication();
+        $this->registerUpdateListeners();
+        $this->checkForUpdatesOnStartup();
     }
 
     protected function cacheApplication(): void
@@ -143,5 +145,63 @@ class NativeAppServiceProvider implements ProvidesPhpIni
         $menus[] = Menu::help();
 
         Menu::create(...$menus);
+    }
+
+    protected function registerUpdateListeners(): void
+    {
+        if (! env('NATIVEPHP_RUNNING', false)) return;
+
+        Event::listen(\Native\Desktop\Events\AutoUpdater\UpdateAvailable::class, function ($event) {
+            \Illuminate\Support\Facades\Cache::put('update_download_status', 'available');
+            \Illuminate\Support\Facades\Cache::put('latest_version_available', $event->version);
+
+            try {
+                \Native\Desktop\Facades\Notification::title('Update Available')
+                    ->message("A new supermarket update is available (v{$event->version})! Open the app settings to download it.")
+                    ->show();
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Desktop Notification Failed: ' . $e->getMessage());
+            }
+        });
+
+        Event::listen(\Native\Desktop\Events\AutoUpdater\DownloadProgress::class, function ($event) {
+            \Illuminate\Support\Facades\Cache::put('update_download_status', 'downloading');
+            \Illuminate\Support\Facades\Cache::put('update_download_progress', round($event->percent));
+        });
+
+        Event::listen(\Native\Desktop\Events\AutoUpdater\UpdateDownloaded::class, function () {
+            \Illuminate\Support\Facades\Cache::put('update_download_status', 'downloaded');
+            \Illuminate\Support\Facades\Cache::put('update_download_progress', 100);
+
+            try {
+                \Native\Desktop\Facades\Notification::title('Update Ready')
+                    ->message('The new update has been downloaded and is ready to install! Open app settings to restart.')
+                    ->show();
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Desktop Notification Failed: ' . $e->getMessage());
+            }
+        });
+
+        Event::listen(\Native\Desktop\Events\AutoUpdater\UpdateNotAvailable::class, function () {
+            \Illuminate\Support\Facades\Cache::put('update_download_status', 'idle');
+            \Illuminate\Support\Facades\Cache::forget('latest_version_available');
+            \Illuminate\Support\Facades\Cache::forget('update_download_progress');
+        });
+
+        Event::listen(\Native\Desktop\Events\AutoUpdater\Error::class, function ($event) {
+            \Illuminate\Support\Facades\Cache::put('update_download_status', 'error');
+            \Illuminate\Support\Facades\Cache::put('update_error_message', $event->message ?? 'Unknown error');
+        });
+    }
+
+    protected function checkForUpdatesOnStartup(): void
+    {
+        if (! env('NATIVEPHP_RUNNING', false)) return;
+
+        try {
+            \Native\Desktop\Facades\AutoUpdater::checkForUpdates();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('AutoUpdater startup check failed: ' . $e->getMessage());
+        }
     }
 }
