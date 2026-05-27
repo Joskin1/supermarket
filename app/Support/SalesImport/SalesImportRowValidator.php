@@ -22,8 +22,8 @@ class SalesImportRowValidator
         $normalized = [
             'date' => $this->normalizeDate($row['date'] ?? null),
             'time' => $this->normalizeTime($row['time'] ?? null),
-            'barcode' => $this->normalizeString($row['barcode'] ?? null),
-            'sku' => Str::upper((string) $this->normalizeString($row['sku'] ?? $row['product_code'] ?? null)),
+            'barcode' => $this->normalizeBarcodeOrSku($row['barcode'] ?? null),
+            'sku' => Str::upper((string) $this->normalizeBarcodeOrSku($row['sku'] ?? $row['product_code'] ?? null)),
             'product_name' => $this->normalizeString($row['product_name'] ?? null),
             'unit_price' => $this->normalizeNumeric($row['unit_price'] ?? null),
             'quantity_sold' => $this->normalizeInteger($row['quantity_sold'] ?? null),
@@ -114,6 +114,11 @@ class SalesImportRowValidator
 
             $time = trim((string) $value);
 
+            // If time is entered as hh:mm, append :00 to format it as hh:mm:ss for strict validation
+            if (preg_match('/^\d{1,2}:\d{2}$/', $time)) {
+                $time .= ':00';
+            }
+
             return CarbonImmutable::parse($time)->format('H:i:s');
         } catch (\Throwable) {
             return trim((string) $value);
@@ -129,20 +134,46 @@ class SalesImportRowValidator
         return trim((string) $value);
     }
 
-    protected function normalizeNumeric(mixed $value): string|float|int|null
+    protected function normalizeBarcodeOrSku(mixed $value): ?string
+    {
+        if (blank($value)) {
+            return null;
+        }
+
+        $str = trim((string) $value);
+
+        // Remove trailing .0 or .00 if present
+        if (preg_match('/^\d+\.0+$/', $str)) {
+            $str = explode('.', $str)[0];
+        }
+
+        // Convert scientific notation like 5.0123456789E+12 to plain integer string
+        if (stripos($str, 'e') !== false && is_numeric($str)) {
+            $str = sprintf('%.0f', (float) $str);
+        }
+
+        return $str;
+    }
+
+    protected function normalizeNumeric(mixed $value): ?float
     {
         if (blank($value)) {
             return null;
         }
 
         if (is_numeric($value)) {
-            return $value;
+            return (float) $value;
         }
 
-        return str_replace(',', '', trim((string) $value));
+        $cleaned = str_replace([',', '$', ' '], '', trim((string) $value));
+        if (is_numeric($cleaned)) {
+            return (float) $cleaned;
+        }
+
+        return null;
     }
 
-    protected function normalizeInteger(mixed $value): int|string|null
+    protected function normalizeInteger(mixed $value): ?int
     {
         if (blank($value)) {
             return null;
@@ -152,6 +183,16 @@ class SalesImportRowValidator
             return $value;
         }
 
-        return str_replace(',', '', trim((string) $value));
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        $cleaned = str_replace([',', ' '], '', trim((string) $value));
+        if (is_numeric($cleaned)) {
+            return (int) $cleaned;
+        }
+
+        return null;
     }
 }
+
