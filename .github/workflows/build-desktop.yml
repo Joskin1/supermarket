@@ -56,27 +56,8 @@ jobs:
       - name: Install Composer Dependencies
         run: composer install --no-scripts --no-ansi --no-interaction --no-progress --prefer-dist --optimize-autoloader --ignore-platform-reqs
 
-      # Diagnostic step: capture and display the ACTUAL error in annotations
-      - name: Bootstrap Laravel
-        run: |
-          echo "--- Testing autoloader ---"
-          php -r "require 'vendor/autoload.php'; echo 'Autoloader: OK' . PHP_EOL;" 2>&1 || echo "::error::Autoloader failed to load"
-
-          echo "--- Testing artisan boot ---"
-          ERROR_OUTPUT=$(php artisan --version 2>&1) && echo "Artisan: $ERROR_OUTPUT" || {
-            echo "::error::Artisan boot failed: $ERROR_OUTPUT"
-            echo "--- Checking PHP extensions ---"
-            php -m 2>&1
-            echo "--- Checking PHP version ---"
-            php -v 2>&1
-            exit 1
-          }
-
-          echo "--- Discovering packages ---"
-          DISCOVER_OUTPUT=$(php artisan package:discover --ansi 2>&1) && echo "$DISCOVER_OUTPUT" || {
-            echo "::error::Package discover failed: $DISCOVER_OUTPUT"
-            exit 1
-          }
+      - name: Discover Packages
+        run: php artisan package:discover --ansi
 
       - name: Install NPM Dependencies
         run: npm ci

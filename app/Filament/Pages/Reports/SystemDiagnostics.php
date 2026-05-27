@@ -12,7 +12,7 @@ use ZipArchive;
 class SystemDiagnostics extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-cpu-chip';
-    protected static ?string $navigationGroup = 'System';
+    protected static \UnitEnum|string|null $navigationGroup = 'System';
     protected static ?string $title = 'System Diagnostics';
     protected static ?int $navigationSort = 100;
     protected static string $view = 'filament.pages.reports.system-diagnostics';
