@@ -20,6 +20,9 @@ jobs:
             artifact_name: White-Mart-macOS
 
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: Checkout code
@@ -35,7 +38,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install Composer Dependencies
@@ -50,7 +53,7 @@ jobs:
           touch database/database.sqlite
 
       - name: Generate Application Key
-        run: php artisan key:generate
+        run: php artisan key:generate --force --no-interaction
 
       - name: Build Desktop Application
         run: php artisan native:build
@@ -61,7 +64,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: dist/*
+          path: |
+            nativephp/electron/dist/*.exe
+            nativephp/electron/dist/*.AppImage
+            nativephp/electron/dist/*.deb
+            nativephp/electron/dist/*.dmg
+            nativephp/electron/dist/*.zip
           retention-days: 7
 
   release:
