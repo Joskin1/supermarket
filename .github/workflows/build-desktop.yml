@@ -32,7 +32,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: dom, curl, libxml, mbstring, zip, pdo, sqlite3, pdo_sqlite, bcmath, intl, gd, exif, iconv, xmlwriter, xml
+          extensions: dom, curl, libxml, mbstring, zip, pdo, sqlite3, pdo_sqlite, bcmath, intl, gd, exif, iconv, xmlwriter, xml, fileinfo
           coverage: none
 
       - name: Setup Node.js
@@ -41,19 +41,21 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Install Composer Dependencies
-        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --optimize-autoloader --ignore-platform-reqs
-
-      - name: Install NPM Dependencies
-        run: npm ci
-
+      # IMPORTANT: Environment must be ready BEFORE composer install
+      # because composer's post-autoload-dump scripts run artisan commands
+      # (package:discover, filament:upgrade) which boot the full Laravel app.
       - name: Prepare Environment
         run: |
           cp .env.example .env
+          mkdir -p database
           touch database/database.sqlite
+          php -r "file_put_contents('.env', str_replace('APP_KEY=', 'APP_KEY=base64:' . base64_encode(random_bytes(32)), file_get_contents('.env')));"
 
-      - name: Generate Application Key
-        run: php artisan key:generate --force --no-interaction
+      - name: Install Composer Dependencies
+        run: composer install --no-ansi --no-interaction --no-progress --prefer-dist --optimize-autoloader --ignore-platform-reqs
+
+      - name: Install NPM Dependencies
+        run: npm ci
 
       - name: Build Desktop Application
         run: php artisan native:build
@@ -66,17 +68,20 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: |
             nativephp/electron/dist/*.exe
+            nativephp/electron/dist/*.msi
             nativephp/electron/dist/*.AppImage
             nativephp/electron/dist/*.deb
             nativephp/electron/dist/*.dmg
             nativephp/electron/dist/*.zip
+            nativephp/electron/dist/*.yml
+          if-no-files-found: warn
           retention-days: 7
 
   release:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
-    
+
     steps:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
