@@ -105,12 +105,19 @@ jobs:
         with:
           path: dist/
 
+      - name: List downloaded files
+        run: find dist/ -type f | head -50
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/White-Mart-Linux/*
-            dist/White-Mart-Windows/*
-            dist/White-Mart-macOS/*
+            dist/**/*.exe
+            dist/**/*.msi
+            dist/**/*.AppImage
+            dist/**/*.deb
+            dist/**/*.dmg
+            dist/**/*.zip
           draft: false
           generate_release_notes: true
+
