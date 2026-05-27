@@ -31,7 +31,11 @@ class NativeAppServiceProvider implements ProvidesPhpIni
     protected function bootstrapProductionDatabase(): void
     {
         try {
-            if (\Illuminate\Support\Facades\Schema::hasTable('users') && \App\Models\User::count() === 0) {
+            if (! \Illuminate\Support\Facades\Schema::hasTable('users')) {
+                \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+            }
+
+            if (\App\Models\User::count() === 0) {
                 \Illuminate\Support\Facades\Artisan::call('db:seed', [
                     '--class' => \Database\Seeders\RoleSeeder::class,
                     '--force' => true,
@@ -46,7 +50,7 @@ class NativeAppServiceProvider implements ProvidesPhpIni
                 $user->syncRoles([\App\Enums\RoleEnum::SUDO->value]);
             }
         } catch (\Exception $e) {
-            // Ignore if migrations haven't run yet
+            \Illuminate\Support\Facades\Log::error('Database Bootstrap Error: ' . $e->getMessage());
         }
     }
 
