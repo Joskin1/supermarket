@@ -14,8 +14,8 @@ use Illuminate\Support\Facades\Event;
 
 class SystemUpdate extends Page
 {
-    protected static ?string $navigationIcon = 'heroicon-o-arrow-path';
-    protected static ?string $navigationGroup = 'System';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-arrow-path';
+    protected static \UnitEnum|string|null $navigationGroup = 'System';
     protected static ?int $navigationSort = 110;
     protected static string $view = 'filament.pages.system-update';
 
