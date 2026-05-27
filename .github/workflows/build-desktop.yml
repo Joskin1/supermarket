@@ -109,5 +109,5 @@ jobs:
             dist/White-Mart-Linux/*
             dist/White-Mart-Windows/*
             dist/White-Mart-macOS/*
-          draft: true
+          draft: false
           generate_release_notes: true
