@@ -6,8 +6,8 @@ use App\Filament\Pages\DailySalesExport;
 use App\Filament\Resources\SalesImportBatches\SalesImportBatchResource;
 use App\Actions\Sales\CreateSalesImportBatchAction;
 use App\Actions\Sales\ProcessSalesImportAction;
-use App\Services\Desktop\FileDialogService;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
@@ -26,20 +26,29 @@ class ListSalesImportBatches extends ListRecords
             Action::make('upload')
                 ->label('Import Sales File')
                 ->icon('heroicon-o-arrow-up-tray')
-                ->requiresConfirmation()
                 ->modalHeading('Import Sales')
-                ->modalDescription('Click confirm to select the sales spreadsheet from your computer.')
+                ->modalDescription('Upload your daily sales spreadsheet below.')
                 ->form([
+                    FileUpload::make('file')
+                        ->label('Sales Spreadsheet')
+                        ->acceptedFileTypes([
+                            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                            'application/vnd.ms-excel',
+                            'text/csv'
+                        ])
+                        ->storeFiles(false)
+                        ->required(),
                     Textarea::make('notes')
                         ->label('Batch Notes (Optional)')
                         ->maxLength(2000),
                 ])
                 ->action(function (array $data) {
-                    $path = app(FileDialogService::class)->selectSpreadsheet();
+                    /** @var \Illuminate\Http\UploadedFile $file */
+                    $file = $data['file'];
 
-                    if ($path) {
+                    if ($file) {
                         $batch = app(CreateSalesImportBatchAction::class)->execute([
-                            'file' => $path,
+                            'file' => $file->getRealPath(),
                             'uploaded_by' => auth()->id(),
                             'notes' => $data['notes'] ?? null,
                         ]);

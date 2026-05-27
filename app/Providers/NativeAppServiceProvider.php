@@ -26,6 +26,26 @@ class NativeAppServiceProvider implements ProvidesPhpIni
         $this->registerGlobalShortcuts();
         $this->registerShortcutListeners();
         $this->bootstrapProductionDatabase();
+        $this->cacheApplication();
+    }
+
+    protected function cacheApplication(): void
+    {
+        try {
+            // Automatically cache configuration, routes, and views on the local machine
+            // to drastically improve the performance of the NativePHP application.
+            if (! app()->configurationIsCached()) {
+                \Illuminate\Support\Facades\Artisan::call('config:cache');
+            }
+            if (! app()->routesAreCached()) {
+                \Illuminate\Support\Facades\Artisan::call('route:cache');
+            }
+            if (! app()->eventsAreCached()) {
+                \Illuminate\Support\Facades\Artisan::call('event:cache');
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Application Cache Error: ' . $e->getMessage());
+        }
     }
 
     protected function bootstrapProductionDatabase(): void
