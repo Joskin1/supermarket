@@ -5,6 +5,8 @@ on:
     tags:
       - 'v*' # Trigger on version tags, e.g., v1.0.0
   workflow_dispatch: # Allow manual trigger
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -14,10 +16,13 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact_name: White-Mart-Linux
+            build_os: linux
           - os: windows-latest
             artifact_name: White-Mart-Windows
+            build_os: win
           - os: macos-latest
             artifact_name: White-Mart-macOS
+            build_os: mac
 
     runs-on: ${{ matrix.os }}
     defaults:
@@ -63,7 +68,7 @@ jobs:
         run: npm ci
 
       - name: Build Desktop Application
-        run: php artisan native:build
+        run: php artisan native:build ${{ matrix.build_os }}
         env:
           NATIVEPHP_APP_VERSION: ${{ github.ref_name }}
 
