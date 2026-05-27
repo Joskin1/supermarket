@@ -96,7 +96,7 @@ class ListSalesImportBatches extends ListRecords
                                 ->send(),
                         };
 
-                        return redirect(SalesImportBatchResource::getUrl('view', ['record' => $batch]));
+                        $this->redirect(SalesImportBatchResource::getUrl('view', ['record' => $batch]));
                     } catch (ValidationException $e) {
                         Notification::make()
                             ->title('Import Rejected')
