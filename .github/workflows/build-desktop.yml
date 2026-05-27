@@ -68,7 +68,9 @@ jobs:
         run: npm ci
 
       - name: Build Desktop Application
-        run: php artisan native:build ${{ matrix.build_os }}
+        run: |
+          php artisan native:build ${{ matrix.build_os }} > native_build.log 2>&1
+          cat native_build.log
         env:
           NATIVEPHP_APP_VERSION: ${{ github.ref_name }}
 
@@ -77,6 +79,7 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}
           path: |
+            native_build.log
             nativephp/electron/dist/*.exe
             nativephp/electron/dist/*.msi
             nativephp/electron/dist/*.AppImage
