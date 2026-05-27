@@ -43,23 +43,36 @@ class ListSalesImportBatches extends ListRecords
                         ->maxLength(2000),
                 ])
                 ->action(function (array $data) {
-                    /** @var \Illuminate\Http\UploadedFile $file */
-                    $file = $data['file'];
+                    // Filament FileUpload with storeFiles(false) returns either:
+                    // - A TemporaryUploadedFile object (single file), or
+                    // - An array of them (multiple). We only allow one file.
+                    $fileInput = $data['file'] ?? null;
 
-                    if ($file) {
-                        $batch = app(CreateSalesImportBatchAction::class)->execute([
-                            'file' => $file->getRealPath(),
-                            'uploaded_by' => auth()->id(),
-                            'notes' => $data['notes'] ?? null,
-                        ]);
-
-                        app(ProcessSalesImportAction::class)->execute($batch);
-
-                        Notification::make()
-                            ->title('Sales file imported successfully')
-                            ->success()
-                            ->send();
+                    // Unwrap array if needed (Filament wraps single uploads in an array)
+                    if (is_array($fileInput)) {
+                        $fileInput = reset($fileInput);
                     }
+
+                    if (! $fileInput) {
+                        \Filament\Notifications\Notification::make()
+                            ->title('No file selected')
+                            ->warning()
+                            ->send();
+                        return;
+                    }
+
+                    $batch = app(CreateSalesImportBatchAction::class)->execute([
+                        'file' => $fileInput,
+                        'uploaded_by' => auth()->id(),
+                        'notes' => $data['notes'] ?? null,
+                    ]);
+
+                    app(ProcessSalesImportAction::class)->execute($batch);
+
+                    Notification::make()
+                        ->title('Sales file imported successfully')
+                        ->success()
+                        ->send();
                 }),
         ];
     }

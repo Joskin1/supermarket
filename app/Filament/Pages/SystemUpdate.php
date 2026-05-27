@@ -17,7 +17,7 @@ class SystemUpdate extends Page
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-arrow-path';
     protected static \UnitEnum|string|null $navigationGroup = 'System';
     protected static ?int $navigationSort = 110;
-    protected static string $view = 'filament.pages.system-update';
+    protected string $view = 'filament.pages.system-update';
 
     public string $currentVersion;
     public bool $isDesktop;
