@@ -160,8 +160,10 @@ class SalesEntryLogSheetExport implements FromArray, ShouldAutoSize, WithEvents,
         $max = DailySalesTemplateColumns::ENTRY_TEMPLATE_ROWS + 1;
 
         return sprintf(
-            '=IF($C%d<>"",IFERROR(INDEX(\'%s\'!$D$2:$D$%d,MATCH($C%d,\'%s\'!$A$2:$A$%d,0)),""),IF($D%d<>"",IFERROR(INDEX(\'%s\'!$D$2:$D$%d,MATCH($D%d,\'%s\'!$B$2:$B$%d,0)),""),""))',
+            '=IF($C%d<>"",IF(ISNA(VLOOKUP($C%d,\'%s\'!$A$2:$E$%d,4,FALSE)),"",VLOOKUP($C%d,\'%s\'!$A$2:$E$%d,4,FALSE)),IF($D%d<>"",IF(ISNA(VLOOKUP($D%d,\'%s\'!$B$2:$E$%d,3,FALSE)),"",VLOOKUP($D%d,\'%s\'!$B$2:$E$%d,3,FALSE)),""))',
+            $rowNumber,
             $rowNumber, $ref, $max, $rowNumber, $ref, $max,
+            $rowNumber,
             $rowNumber, $ref, $max, $rowNumber, $ref, $max,
         );
     }
@@ -175,8 +177,10 @@ class SalesEntryLogSheetExport implements FromArray, ShouldAutoSize, WithEvents,
         $max = DailySalesTemplateColumns::ENTRY_TEMPLATE_ROWS + 1;
 
         return sprintf(
-            '=IF($C%d<>"",IFERROR(INDEX(\'%s\'!$E$2:$E$%d,MATCH($C%d,\'%s\'!$A$2:$A$%d,0)),""),IF($D%d<>"",IFERROR(INDEX(\'%s\'!$E$2:$E$%d,MATCH($D%d,\'%s\'!$B$2:$B$%d,0)),""),""))',
+            '=IF($C%d<>"",IF(ISNA(VLOOKUP($C%d,\'%s\'!$A$2:$E$%d,5,FALSE)),"",VLOOKUP($C%d,\'%s\'!$A$2:$E$%d,5,FALSE)),IF($D%d<>"",IF(ISNA(VLOOKUP($D%d,\'%s\'!$B$2:$E$%d,4,FALSE)),"",VLOOKUP($D%d,\'%s\'!$B$2:$E$%d,4,FALSE)),""))',
+            $rowNumber,
             $rowNumber, $ref, $max, $rowNumber, $ref, $max,
+            $rowNumber,
             $rowNumber, $ref, $max, $rowNumber, $ref, $max,
         );
     }

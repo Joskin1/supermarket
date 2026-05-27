@@ -60,6 +60,37 @@ return [
             'report' => false,
         ],
 
+        /*
+        |----------------------------------------------------------------------
+        | Desktop App Storage Disks
+        |----------------------------------------------------------------------
+        | These disks organize local file storage for the desktop application.
+        */
+
+        'backups' => [
+            'driver' => 'local',
+            'root' => storage_path('app/backups'),
+            'throw' => false,
+        ],
+
+        'exports' => [
+            'driver' => 'local',
+            'root' => storage_path('app/exports'),
+            'throw' => false,
+        ],
+
+        'receipts' => [
+            'driver' => 'local',
+            'root' => storage_path('app/receipts'),
+            'throw' => false,
+        ],
+
+        'imports' => [
+            'driver' => 'local',
+            'root' => storage_path('app/imports'),
+            'throw' => false,
+        ],
+
     ],
 
     /*

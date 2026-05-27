@@ -56,7 +56,6 @@ class SalesImportBatchResource extends Resource
     {
         return [
             'index' => ListSalesImportBatches::route('/'),
-            'create' => CreateSalesImportBatch::route('/upload'),
             'view' => ViewSalesImportBatch::route('/{record}'),
         ];
     }

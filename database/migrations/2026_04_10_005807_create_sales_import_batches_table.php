@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('file_path')->nullable();
             $table->string('original_file_name')->nullable();
             $table->string('file_hash', 64)->index();
-            $table->foreignId('uploaded_by')->constrained('users')->restrictOnDelete();
+            $table->foreignId('uploaded_by')->nullable()->constrained('users')->nullOnDelete();
             $table->string('status')->default('uploaded')->index();
             $table->date('sales_date_from')->nullable()->index();
             $table->date('sales_date_to')->nullable()->index();

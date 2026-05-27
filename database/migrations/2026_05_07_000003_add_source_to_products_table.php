@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('products', function (Blueprint $table): void {
-            $table->string('source', 50)->default('manual')->after('barcode');
+            $table->string('source', 50)->default('manual');
         });
     }
 

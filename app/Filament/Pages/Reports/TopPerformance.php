@@ -121,12 +121,12 @@ class TopPerformance extends BaseReportPage
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('export_xlsx')
-                ->label('Export XLSX')
+            Action::make('export_xls')
+                ->label('Export XLS')
                 ->icon('heroicon-o-arrow-down-tray')
                 ->action(fn () => $this->downloadExport(
                     new TopProductsExport($this->normalizedTab(), $this->reportRange[0], $this->reportRange[1]),
-                    $this->buildExportFilename('xlsx'),
+                    $this->buildExportFilename('xls'),
                 )),
             Action::make('export_csv')
                 ->label('Export CSV')

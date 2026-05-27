@@ -83,8 +83,25 @@ abstract class BaseReportPage extends Page
             : $from->format('d M Y').' to '.$to->format('d M Y');
     }
 
-    protected function downloadExport(object $export, string $filename): BinaryFileResponse
+    protected function downloadExport(object $export, string $filename): void
     {
-        return Excel::download($export, $filename);
+        $path = app(\App\Services\Desktop\FileDialogService::class)->saveSpreadsheet($filename);
+
+        if ($path) {
+            $extension = pathinfo($filename, PATHINFO_EXTENSION);
+            $tempName = 'temp_export.' . $extension;
+            
+            // NativePHP does not allow returning BinaryFileResponse easily in this context,
+            // so we save it locally and copy to the user's selected destination.
+            $localPath = \Illuminate\Support\Facades\Storage::disk('local')->path($tempName);
+            Excel::store($export, $tempName, 'local');
+            \Illuminate\Support\Facades\File::copy($localPath, $path);
+            \Illuminate\Support\Facades\File::delete($localPath);
+            
+            \Filament\Notifications\Notification::make()
+                ->title('Export saved successfully.')
+                ->success()
+                ->send();
+        }
     }
 }

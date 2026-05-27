@@ -10,7 +10,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('system_settings', function (Blueprint $table) {
-            $table->string('singleton_key')->nullable()->after('id');
+            $table->string('singleton_key')->nullable();
         });
 
         $rows = DB::table('system_settings')

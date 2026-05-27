@@ -85,6 +85,6 @@ class ProductionReadinessCheck
 
     protected function isProductionMode(): bool
     {
-        return config('app.env') === 'production';
+        return config('app.env') === 'production' && ! env('NATIVEPHP_RUNNING');
     }
 }

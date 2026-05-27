@@ -20,24 +20,51 @@ class CreateSalesImportBatchAction
     public function execute(array $input): SalesImportBatch
     {
         $data = Validator::make($input, [
-            'file' => ['bail', 'required', 'file', 'max:10240', 'mimes:xlsx'],
+            'file' => ['bail', 'required'],
             'uploaded_by' => ['required', 'integer', 'exists:users,id'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ])->after(function ($validator) use ($input): void {
-            $file = $input['file'] ?? null;
+            $fileInput = $input['file'] ?? null;
+            
+            if (is_string($fileInput) && file_exists($fileInput)) {
+                $file = new UploadedFile(
+                    $fileInput,
+                    basename($fileInput),
+                    mime_content_type($fileInput) ?: 'text/csv',
+                    null,
+                    true
+                );
+                $input['file'] = $file;
+            } else {
+                $file = $fileInput;
+            }
 
             if (! $file instanceof UploadedFile) {
+                $validator->errors()->add('file', 'A valid file is required.');
                 return;
             }
 
             // Defense-in-depth: verify real extension even after MIME check.
-            if (strtolower($file->getClientOriginalExtension()) !== 'xlsx') {
-                $validator->errors()->add('file', 'The sales file must be an .xlsx workbook.');
+            $ext = strtolower($file->getClientOriginalExtension());
+            if (! in_array($ext, ['xlsx', 'xls', 'csv'])) {
+                $validator->errors()->add('file', 'The sales file must be an .xlsx, .xls, or .csv workbook.');
             }
         })->validate();
 
+        $fileInput = $data['file'];
+        if (is_string($fileInput) && file_exists($fileInput)) {
+            $file = new UploadedFile(
+                $fileInput,
+                basename($fileInput),
+                mime_content_type($fileInput) ?: 'text/csv',
+                null,
+                true
+            );
+        } else {
+            $file = $fileInput;
+        }
+        
         /** @var UploadedFile $file */
-        $file = $data['file'];
         $fileHash = hash_file('sha256', $file->getRealPath());
 
         $existingBatch = SalesImportBatch::query()

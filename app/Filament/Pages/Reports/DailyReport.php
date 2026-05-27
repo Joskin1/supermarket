@@ -77,12 +77,12 @@ class DailyReport extends BaseReportPage
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('export_xlsx')
-                ->label('Export XLSX')
+            Action::make('export_xls')
+                ->label('Export XLS')
                 ->icon('heroicon-o-arrow-down-tray')
                 ->action(fn () => $this->downloadExport(
                     new DailySalesReportExport($this->reportData['from'], $this->reportData['to']),
-                    $this->buildExportFilename('xlsx'),
+                    $this->buildExportFilename('xls'),
                 )),
             Action::make('export_csv')
                 ->label('Export CSV')

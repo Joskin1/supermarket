@@ -19,7 +19,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 use Spatie\Permission\Traits\HasRoles;
 
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
-class User extends Authenticatable implements FilamentUser, MustVerifyEmailContract
+class User extends Authenticatable implements FilamentUser
 {
     /**
      * The attributes that are mass assignable.

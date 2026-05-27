@@ -29,10 +29,15 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login(Login::class)
-            ->passwordReset()
-            ->emailVerification()
+            // Email verification and password reset removed for desktop:
+            // No SMTP available in offline mode. Password reset is handled
+            // by the sudo user directly via the admin panel.
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->brandName(config('app.name'))
+            ->font('Inter')
+            ->maxContentWidth('full')
+            ->sidebarCollapsibleOnDesktop()
+            ->breadcrumbs(false)
             ->colors([
                 'primary' => Color::Emerald,
             ])

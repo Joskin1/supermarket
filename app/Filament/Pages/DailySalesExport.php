@@ -7,6 +7,11 @@ use App\Filament\Resources\SalesImportBatches\SalesImportBatchResource;
 use App\Models\SalesImportBatch;
 use App\Support\SalesImport\DailySalesTemplateColumns;
 use BackedEnum;
+use App\Actions\Sales\CreateSalesImportBatchAction;
+use App\Actions\Sales\ProcessSalesImportAction;
+use App\Services\Desktop\FileDialogService;
+use Filament\Forms\Components\Textarea;
+use Filament\Notifications\Notification;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -36,10 +41,7 @@ class DailySalesExport extends Page
         return DailySalesTemplateColumns::all();
     }
 
-    public function getUploadUrl(): string
-    {
-        return SalesImportBatchResource::getUrl('create');
-    }
+
 
     public function getProductReferenceSheetName(): string
     {
@@ -69,7 +71,32 @@ class DailySalesExport extends Page
             Action::make('upload_completed_sheet')
                 ->label('Upload Completed Sheet')
                 ->icon('heroicon-o-arrow-up-tray')
-                ->url($this->getUploadUrl()),
+                ->requiresConfirmation()
+                ->modalHeading('Import Sales')
+                ->modalDescription('Click confirm to select the completed daily sales spreadsheet from your computer.')
+                ->form([
+                    Textarea::make('notes')
+                        ->label('Batch Notes (Optional)')
+                        ->maxLength(2000),
+                ])
+                ->action(function (array $data) {
+                    $path = app(FileDialogService::class)->selectSpreadsheet();
+
+                    if ($path) {
+                        $batch = app(CreateSalesImportBatchAction::class)->execute([
+                            'file' => $path,
+                            'uploaded_by' => auth()->id(),
+                            'notes' => $data['notes'] ?? null,
+                        ]);
+
+                        app(ProcessSalesImportAction::class)->execute($batch);
+
+                        Notification::make()
+                            ->title('Sales file imported successfully')
+                            ->success()
+                            ->send();
+                    }
+                }),
         ];
     }
 }

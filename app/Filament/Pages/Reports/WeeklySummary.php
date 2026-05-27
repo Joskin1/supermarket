@@ -109,12 +109,12 @@ class WeeklySummary extends BaseReportPage
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('export_xlsx')
-                ->label('Export XLSX')
+            Action::make('export_xls')
+                ->label('Export XLS')
                 ->icon('heroicon-o-arrow-down-tray')
                 ->action(fn () => $this->downloadExport(
-                    new WeeklySummaryExport($this->reportData['from'], $this->reportData['to']),
-                    $this->buildExportFilename('xlsx'),
+                    new WeeklySummaryExport($this->reportRange[0], $this->reportRange[1]),
+                    $this->buildExportFilename('xls'),
                 )),
             Action::make('export_csv')
                 ->label('Export CSV')

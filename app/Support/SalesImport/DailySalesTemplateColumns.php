@@ -4,9 +4,9 @@ namespace App\Support\SalesImport;
 
 class DailySalesTemplateColumns
 {
-    public const PRODUCT_REFERENCE_SHEET = 'Product Reference';
+    public const PRODUCT_REFERENCE_SHEET = 'Ref';
 
-    public const SALES_ENTRY_LOG_SHEET = 'Daily Sales Entry';
+    public const SALES_ENTRY_LOG_SHEET = 'Sales';
 
     public const ENTRY_TEMPLATE_ROWS = 1000;
 
