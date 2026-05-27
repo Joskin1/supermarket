@@ -32,7 +32,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: dom, curl, libxml, mbstring, zip, pdo, sqlite3, pdo_sqlite, bcmath, intl, gd, exif, iconv, xmlwriter, xml, fileinfo
+          extensions: dom, curl, libxml, mbstring, zip, pdo, sqlite3, pdo_sqlite, bcmath, intl, gd, exif, iconv, xmlwriter, xml, fileinfo, simplexml
           coverage: none
 
       - name: Setup Node.js
@@ -41,21 +41,37 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      # IMPORTANT: Environment must be ready BEFORE composer install
-      # because composer's post-autoload-dump scripts run artisan commands
-      # (package:discover, filament:upgrade) which boot the full Laravel app.
+      # CRITICAL: Environment must be fully ready BEFORE composer install.
+      # Composer's post-autoload-dump scripts run `php artisan` commands
+      # which boot the full Laravel app and need .env, APP_KEY, database, and storage dirs.
       - name: Prepare Environment
         run: |
           cp .env.example .env
           mkdir -p database
           touch database/database.sqlite
+          mkdir -p storage/framework/cache/data
+          mkdir -p storage/framework/sessions
+          mkdir -p storage/framework/views
+          mkdir -p storage/logs
+          mkdir -p bootstrap/cache
           php -r "file_put_contents('.env', str_replace('APP_KEY=', 'APP_KEY=base64:' . base64_encode(random_bytes(32)), file_get_contents('.env')));"
 
+      # Use --no-scripts to skip composer's post-autoload-dump hooks
+      # (package:discover, filament:upgrade) which can crash in CI.
+      # We run package:discover manually in the next step instead.
       - name: Install Composer Dependencies
-        run: composer install --no-ansi --no-interaction --no-progress --prefer-dist --optimize-autoloader --ignore-platform-reqs
+        run: composer install --no-scripts --no-ansi --no-interaction --no-progress --prefer-dist --optimize-autoloader --ignore-platform-reqs
+
+      # Manually discover packages (required for NativePHP service provider).
+      # This is safer than letting composer run ALL scripts including filament:upgrade.
+      - name: Discover Packages
+        run: php artisan package:discover --ansi
 
       - name: Install NPM Dependencies
         run: npm ci
+
+      - name: Verify Framework Boots
+        run: php artisan --version
 
       - name: Build Desktop Application
         run: php artisan native:build
