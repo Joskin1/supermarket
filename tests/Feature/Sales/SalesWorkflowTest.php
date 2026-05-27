@@ -698,4 +698,48 @@ class SalesWorkflowTest extends TestCase
         $this->assertDatabaseCount('sales_records', 0);
         $this->assertDatabaseCount('sales_import_failures', 0);
     }
+
+    public function test_scientific_notation_and_float_normalization_works_perfectly(): void
+    {
+        $uploader = User::factory()->create();
+        $product = Product::factory()->create([
+            'sku' => 'SKU-FLOAT-TEST',
+            'barcode' => '5012345678901',
+            'selling_price' => 1500,
+            'current_stock' => 10,
+        ]);
+
+        $batch = app(CreateSalesImportBatchAction::class)->execute([
+            'file' => $this->makeSalesWorkbookUpload(
+                [
+                    $this->salesEntryRow([
+                        'date' => '2026-04-10',
+                        'time' => '10:45', // shorter time format hh:mm
+                        'barcode' => '5.012345678901E+12', // scientific notation barcode
+                        'sku' => '',
+                        'product_name' => $product->name,
+                        'unit_price' => '$1,500.00', // currency symbol and commas
+                        'quantity_sold' => '2.0', // float-formatted quantity
+                    ]),
+                ],
+                [$this->referenceRowForProduct($product)],
+            ),
+            'uploaded_by' => $uploader->id,
+        ]);
+
+        $processedBatch = app(ProcessSalesImportAction::class)->execute($batch);
+
+        $this->assertSame(SalesImportBatchStatus::PROCESSED, $processedBatch->status);
+        $this->assertSame(1, $processedBatch->successful_rows);
+        $this->assertSame(0, $processedBatch->failed_rows);
+        $this->assertSame(8, $product->fresh()->current_stock);
+        $this->assertDatabaseHas('sales_records', [
+            'batch_id' => $batch->id,
+            'product_id' => $product->id,
+            'quantity_sold' => 2,
+            'unit_price' => 1500.00,
+            'sales_time' => '10:45:00',
+        ]);
+    }
 }
+

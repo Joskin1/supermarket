@@ -140,6 +140,8 @@ class DailySalesExport extends Page
                                 ->info()
                                 ->send(),
                         };
+
+                        return redirect(SalesImportBatchResource::getUrl('view', ['record' => $batch]));
                     } catch (ValidationException $e) {
                         Notification::make()
                             ->title('Import Rejected')
