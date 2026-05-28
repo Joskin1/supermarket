@@ -83,6 +83,35 @@ class SalesPOSTest extends TestCase
             ->assertDispatched('focus-scan');
     }
 
+    public function test_live_search_fuzzy_lookup_and_selection(): void
+    {
+        $user = User::factory()->create();
+        $user->givePermissionTo('view_any_sales::import::batch');
+        $this->actingAs($user);
+
+        $product = Product::factory()->create([
+            'name' => 'Fuzzy Geloo Drink',
+            'sku' => 'GEL-FUZZY-123',
+            'barcode' => '54321',
+            'selling_price' => 80.00,
+        ]);
+
+        Livewire::test(SalesPOS::class)
+            // Type fuzzy name search
+            ->set('scanQuery', 'Geloo')
+            ->call('updatedScanQuery')
+            // Assert that results list is populated
+            ->assertCount('searchResults', 1)
+            ->assertSet('searchResults.0.name', 'Fuzzy Geloo Drink')
+            
+            // Choose the autocomplete item
+            ->call('selectSearchResult', 0)
+            ->assertSet('searchResults', [])
+            ->assertSet('scanQuery', '')
+            ->assertSet('scannedProduct.id', $product->id)
+            ->assertDispatched('focus-quantity');
+    }
+
     public function test_scanning_a_product_already_in_cart_increments_its_quantity_automatically(): void
     {
         $user = User::factory()->create();

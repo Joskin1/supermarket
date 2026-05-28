@@ -44,10 +44,39 @@
                             id="scanInput"
                             type="text" 
                             wire:model.live.debounce.300ms="scanQuery"
-                            placeholder="Aim scanner here or type SKU manually..."
+                            @keydown.escape.prevent="$wire.searchResults = [];"
+                            placeholder="Aim scanner, type name, or enter SKU manually..."
                             class="block w-full rounded-xl border-0 py-4 pl-12 pr-4 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-base sm:leading-6 dark:bg-gray-800 dark:text-white dark:ring-gray-700 dark:focus:ring-indigo-500"
                             autocomplete="off"
                         />
+
+                        <!-- Floating Search Autocomplete Dropdown -->
+                        @if(!empty($searchResults))
+                            <div class="absolute left-0 right-0 z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-gray-200 bg-white/95 shadow-xl backdrop-blur-md dark:border-gray-800 dark:bg-gray-900/95">
+                                <div class="divide-y divide-gray-100 dark:divide-gray-800">
+                                    @foreach($searchResults as $index => $result)
+                                        <button 
+                                            type="button"
+                                            wire:click="selectSearchResult({{ $index }})"
+                                            class="w-full flex items-center justify-between p-4 text-left hover:bg-indigo-50/50 dark:hover:bg-indigo-950/30 transition group cursor-pointer"
+                                        >
+                                            <div>
+                                                <p class="text-sm font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition">{{ $result['name'] }}</p>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400">SKU: {{ $result['sku'] }} | UPC: {{ $result['barcode'] ?? 'N/A' }} | {{ $result['category'] }}</p>
+                                            </div>
+                                            <div class="flex items-center gap-4">
+                                                <span class="rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase {{ $result['current_stock'] <= 5 ? 'bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-400' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400' }}">
+                                                    {{ $result['current_stock'] }} in stock
+                                                </span>
+                                                <span class="text-sm font-black text-indigo-600 dark:text-indigo-400 font-mono">
+                                                    ₦{{ number_format($result['selling_price'], 2) }}
+                                                </span>
+                                            </div>
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 </div>
 
@@ -76,7 +105,7 @@
                             
                             <div class="text-right">
                                 <p class="text-xs font-medium uppercase tracking-wider text-indigo-200">Authorized Price</p>
-                                <p class="mt-1 text-4xl font-extrabold">${{ number_format($scannedProduct['selling_price'], 2) }}</p>
+                                <p class="mt-1 text-4xl font-extrabold">₦{{ number_format($scannedProduct['selling_price'], 2) }}</p>
                             </div>
                         </div>
 
@@ -167,7 +196,7 @@
                                                 @endif
                                             </td>
                                             <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white text-right">
-                                                ${{ number_format($item['unit_price'], 2) }}
+                                                ₦{{ number_format($item['unit_price'], 2) }}
                                             </td>
                                             <td class="px-6 py-4">
                                                 <!-- Interactive Quantity Adjusters -->
@@ -194,7 +223,7 @@
                                                 </div>
                                             </td>
                                             <td class="px-6 py-4 text-sm font-extrabold text-gray-900 dark:text-white text-right">
-                                                ${{ number_format($item['total'], 2) }}
+                                                ₦{{ number_format($item['total'], 2) }}
                                             </td>
                                             <td class="px-6 py-4 text-center">
                                                 <button 
@@ -230,12 +259,12 @@
                         </div>
                         <div class="flex items-center justify-between text-gray-600 dark:text-gray-400">
                             <span>Line Subtotal:</span>
-                            <span class="font-semibold text-gray-900 dark:text-white">${{ number_format($this->gross_total, 2) }}</span>
+                            <span class="font-semibold text-gray-900 dark:text-white">₦{{ number_format($this->gross_total, 2) }}</span>
                         </div>
                         
                         <div class="border-t border-gray-150 pt-4 dark:border-gray-800">
                             <p class="text-xs uppercase tracking-wider font-semibold text-indigo-600 dark:text-indigo-400">Grand Total Amount</p>
-                            <p class="mt-1 text-5xl font-black tracking-tight text-gray-950 dark:text-white">${{ number_format($this->gross_total, 2) }}</p>
+                            <p class="mt-1 text-5xl font-black tracking-tight text-gray-950 dark:text-white">₦{{ number_format($this->gross_total, 2) }}</p>
                         </div>
                     </div>
 

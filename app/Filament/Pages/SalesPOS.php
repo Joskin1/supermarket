@@ -32,6 +32,7 @@ class SalesPOS extends Page
     public int $quantity = 1;
     public array $cart = [];
     public ?string $notes = null;
+    public array $searchResults = [];
 
     public static function canAccess(): bool
     {
@@ -47,7 +48,8 @@ class SalesPOS extends Page
     {
         $query = trim($this->scanQuery);
 
-        if (blank($query)) {
+        if (blank($query) || strlen($query) < 2) {
+            $this->searchResults = [];
             return;
         }
 
@@ -59,54 +61,93 @@ class SalesPOS extends Page
             $query = sprintf('%.0f', (float) $query);
         }
 
-        // Find the product
-        $product = Product::query()
+        // 1. Direct Exact Barcode or SKU lookup first
+        $exactProduct = Product::query()
             ->with('category:id,name')
             ->where('barcode', $query)
             ->orWhere('sku', $query)
             ->first();
 
-        if (! $product) {
-            Notification::make()
-                ->title('Product Not Found')
-                ->body("No active product matches code: \"{$query}\"")
-                ->warning()
-                ->send();
-            
+        if ($exactProduct) {
+            $this->searchResults = [];
             $this->scanQuery = '';
-            $this->dispatch('focus-scan');
+
+            if (isset($this->cart[$exactProduct->id])) {
+                $this->cart[$exactProduct->id]['quantity']++;
+                $this->cart[$exactProduct->id]['total'] = round($this->cart[$exactProduct->id]['quantity'] * $this->cart[$exactProduct->id]['unit_price'], 2);
+                
+                Notification::make()
+                    ->title('Quantity Incremented')
+                    ->body("{$exactProduct->name} quantity is now {$this->cart[$exactProduct->id]['quantity']}.")
+                    ->success()
+                    ->send();
+
+                $this->dispatch('focus-scan');
+                return;
+            }
+
+            $this->scannedProduct = [
+                'id' => $exactProduct->id,
+                'name' => $exactProduct->name,
+                'sku' => $exactProduct->sku,
+                'barcode' => $exactProduct->barcode,
+                'category' => $exactProduct->category?->name ?? 'Uncategorized',
+                'selling_price' => (float) $exactProduct->selling_price,
+                'current_stock' => (int) $exactProduct->current_stock,
+            ];
+            $this->quantity = 1;
+            $this->dispatch('focus-quantity');
             return;
         }
 
-        // Check if item is already in the cart - if yes, auto-increment for speed!
-        if (isset($this->cart[$product->id])) {
-            $this->cart[$product->id]['quantity']++;
-            $this->cart[$product->id]['total'] = round($this->cart[$product->id]['quantity'] * $this->cart[$product->id]['unit_price'], 2);
+        // 2. Otherwise, fetch up to 5 matching search results
+        $this->searchResults = Product::query()
+            ->with('category:id,name')
+            ->where('name', 'like', "%{$query}%")
+            ->orWhere('barcode', 'like', "%{$query}%")
+            ->orWhere('sku', 'like', "%{$query}%")
+            ->limit(5)
+            ->get()
+            ->map(fn($p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'sku' => $p->sku,
+                'barcode' => $p->barcode,
+                'category' => $p->category?->name ?? 'Uncategorized',
+                'selling_price' => (float) $p->selling_price,
+                'current_stock' => (int) $p->current_stock,
+            ])
+            ->toArray();
+    }
+
+    public function selectSearchResult(int $index): void
+    {
+        if (! isset($this->searchResults[$index])) {
+            return;
+        }
+
+        $selected = $this->searchResults[$index];
+        $this->searchResults = [];
+        $this->scanQuery = '';
+
+        // Check if item is already in the cart - if yes, auto-increment!
+        if (isset($this->cart[$selected['id']])) {
+            $this->cart[$selected['id']]['quantity']++;
+            $this->cart[$selected['id']]['total'] = round($this->cart[$selected['id']]['quantity'] * $this->cart[$selected['id']]['unit_price'], 2);
             
             Notification::make()
                 ->title('Quantity Incremented')
-                ->body("{$product->name} quantity is now {$this->cart[$product->id]['quantity']}.")
+                ->body("{$selected['name']} quantity is now {$this->cart[$selected['id']]['quantity']}.")
                 ->success()
                 ->send();
 
-            $this->scanQuery = '';
             $this->dispatch('focus-scan');
             return;
         }
 
-        // Otherwise, open detail preview card and focus quantity field
-        $this->scannedProduct = [
-            'id' => $product->id,
-            'name' => $product->name,
-            'sku' => $product->sku,
-            'barcode' => $product->barcode,
-            'category' => $product->category?->name ?? 'Uncategorized',
-            'selling_price' => (float) $product->selling_price,
-            'current_stock' => (int) $product->current_stock,
-        ];
+        // Load details preview card and redirect focus
+        $this->scannedProduct = $selected;
         $this->quantity = 1;
-
-        // Shift focus to the quantity input instantly
         $this->dispatch('focus-quantity');
     }
 
@@ -203,6 +244,7 @@ class SalesPOS extends Page
         $this->scannedProduct = null;
         $this->quantity = 1;
         $this->notes = null;
+        $this->searchResults = [];
     }
 
     public function getGrossTotalProperty(): float
@@ -236,6 +278,10 @@ class SalesPOS extends Page
 
             $batch = SalesImportBatch::create([
                 'batch_code' => $batchCode,
+                'file_name' => 'POS-' . $batchCode,
+                'file_hash' => md5($batchCode . now()->toIso8601String()),
+                'file_path' => 'pos_terminal',
+                'original_file_name' => 'POS Terminal Sale',
                 'uploaded_by' => auth()->id(),
                 'status' => SalesImportBatchStatus::PROCESSED,
                 'sales_date_from' => now()->toDateString(),
