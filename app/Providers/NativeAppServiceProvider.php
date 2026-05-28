@@ -92,14 +92,17 @@ class NativeAppServiceProvider implements ProvidesPhpIni
         });
     }
 
-    /**
-     * Return an array of php.ini directives to be set.
-     */
     public function phpIni(): array
     {
         return [
-            'memory_limit' => '256M',
-            'max_execution_time' => '300',
+            'memory_limit' => '512M',
+            'max_execution_time' => '600',
+            // Snappy OPcache precompilation for lightning-fast server responses on Windows
+            'opcache.enable' => '1',
+            'opcache.enable_cli' => '1',
+            'opcache.memory_consumption' => '128',
+            'opcache.interned_strings_buffer' => '8',
+            'opcache.max_accelerated_files' => '10000',
         ];
     }
 
