@@ -1,5 +1,5 @@
 <x-filament-panels::page>
-    <div wire:poll.2s class="grid gap-6">
+    <div @if($this->update_status === 'downloading') wire:poll.2s @else wire:poll.30s @endif class="grid gap-6">
         
         <!-- Application Status Section -->
         <x-filament::section>

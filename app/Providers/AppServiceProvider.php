@@ -56,6 +56,19 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
         $this->configureAuthorization();
 
+        // Tune SQLite for maximum speed and concurrent read/writes (extremely important on Windows!)
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Database\Events\ConnectionEstablished::class, function ($event) {
+            if ($event->connection->getDriverName() === 'sqlite') {
+                $event->connection->unprepared("
+                    PRAGMA journal_mode = WAL;
+                    PRAGMA synchronous = NORMAL;
+                    PRAGMA cache_size = -2000;
+                    PRAGMA temp_store = MEMORY;
+                    PRAGMA busy_timeout = 5000;
+                ");
+            }
+        });
+
         // Desktop app runs on localhost — no HTTPS forcing needed.
         // The NativePHP Electron shell handles the local server.
     }

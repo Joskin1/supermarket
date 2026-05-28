@@ -34,19 +34,13 @@ class NativeAppServiceProvider implements ProvidesPhpIni
     protected function cacheApplication(): void
     {
         try {
-            // Automatically cache configuration, routes, and views on the local machine
-            // to drastically improve the performance of the NativePHP application.
-            if (! app()->configurationIsCached()) {
-                \Illuminate\Support\Facades\Artisan::call('config:cache');
-            }
-            if (! app()->routesAreCached()) {
-                \Illuminate\Support\Facades\Artisan::call('route:cache');
-            }
-            if (! app()->eventsAreCached()) {
-                \Illuminate\Support\Facades\Artisan::call('event:cache');
-            }
+            // Clear any old static configuration, event, or route caches to prevent stale path lockups
+            // and database connection blocks on the local desktop machine.
+            \Illuminate\Support\Facades\Artisan::call('config:clear');
+            \Illuminate\Support\Facades\Artisan::call('route:clear');
+            \Illuminate\Support\Facades\Artisan::call('event:clear');
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Application Cache Error: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('Application Cache Clear Error: ' . $e->getMessage());
         }
     }
 

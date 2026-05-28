@@ -1,4 +1,4 @@
-<div wire:poll.3s class="px-6 py-4 border-t border-gray-100 dark:border-gray-800 space-y-3">
+<div @if($status === 'downloading') wire:poll.3s @else wire:poll.60s @endif class="px-6 py-4 border-t border-gray-100 dark:border-gray-800 space-y-3">
     <!-- Version Display -->
     <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <span>App Version</span>
