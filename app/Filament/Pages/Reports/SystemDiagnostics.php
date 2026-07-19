@@ -39,17 +39,8 @@ class SystemDiagnostics extends Page
         ];
     }
 
-    protected function exportDiagnosticLogs(): void
+    protected function exportDiagnosticLogs(): mixed
     {
-        if (! class_exists(\Native\Desktop\Facades\Dialog::class) || ! env('NATIVEPHP_RUNNING')) {
-            Notification::make()
-                ->danger()
-                ->title('Native Environment Required')
-                ->body('Log exports via the native dialog are only available in the desktop application.')
-                ->send();
-            return;
-        }
-
         $logPath = storage_path('logs');
         
         if (! File::exists($logPath) || count(File::allFiles($logPath)) === 0) {
@@ -58,7 +49,7 @@ class SystemDiagnostics extends Page
                 ->title('No logs found')
                 ->body('The system has not generated any error logs yet.')
                 ->send();
-            return;
+            return null;
         }
 
         // 1. Create a temporary ZIP file
@@ -77,33 +68,45 @@ class SystemDiagnostics extends Page
                 ->title('Export Failed')
                 ->body('Could not create the ZIP archive.')
                 ->send();
-            return;
+            return null;
         }
 
-        // 2. Open Native Save Dialog
         $defaultName = 'WhiteMart_Diagnostics_' . now()->format('Y_m_d_His') . '.zip';
-        
-        $savePath = Dialog::new()
-            ->title('Save Diagnostic Logs')
-            ->defaultPath($defaultName)
-            ->button('Save Logs')
-            ->filters([
-                'ZIP Archives' => ['zip']
-            ])
-            ->save();
 
-        if ($savePath) {
-            // 3. Move the temp file to the selected destination
-            File::move($tempZipPath, $savePath);
+        // 2. Open Native Save Dialog if inside native app
+        if (class_exists(\Native\Desktop\Facades\Dialog::class) && env('NATIVEPHP_RUNNING')) {
+            $savePath = Dialog::new()
+                ->title('Save Diagnostic Logs')
+                ->defaultPath($defaultName)
+                ->button('Save Logs')
+                ->filters([
+                    'ZIP Archives' => ['zip']
+                ])
+                ->save();
 
-            Notification::make()
-                ->success()
-                ->title('Logs Exported Successfully')
-                ->body('The diagnostic logs have been saved to your computer.')
-                ->send();
-        } else {
-            // User cancelled the dialog, clean up temp file
-            File::delete($tempZipPath);
+            if ($savePath) {
+                // 3. Move the temp file to the selected destination
+                File::move($tempZipPath, $savePath);
+
+                Notification::make()
+                    ->success()
+                    ->title('Logs Exported Successfully')
+                    ->body('The diagnostic logs have been saved to your computer.')
+                    ->send();
+            } else {
+                // User cancelled the dialog, clean up temp file
+                File::delete($tempZipPath);
+            }
+            return null;
         }
+
+        // Web browser fallback: Trigger direct browser download response
+        Notification::make()
+            ->success()
+            ->title('Preparing Download')
+            ->body('Starting download of diagnostic logs ZIP archive.')
+            ->send();
+
+        return response()->download($tempZipPath, $defaultName)->deleteFileAfterSend(true);
     }
 }
