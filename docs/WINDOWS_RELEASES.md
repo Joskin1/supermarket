@@ -27,16 +27,15 @@ Do not upload Linux builds to GitHub Releases. The release workflow only publish
    - `nativephp/electron/package.json`
    - `nativephp/electron/package-lock.json`
 
-2. Commit and push the changes.
+2. Commit the changes.
 
-3. Create and push a matching version tag:
+3. Run the release command:
 
 ```bash
-git tag v1.0.28
-git push origin v1.0.28
+composer release:windows
 ```
 
-GitHub Actions will run `.github/workflows/build-desktop.yml` on `windows-latest`, build the NativePHP Windows installer, and attach only Windows release files to the GitHub Release.
+The command pushes your current branch, creates a matching version tag like `v1.0.28`, and pushes that tag. GitHub Actions will then run `.github/workflows/build-desktop.yml` on `windows-latest`, build the NativePHP Windows installer, and attach only Windows release files to the GitHub Release.
 
 ## Manual Release Build
 
