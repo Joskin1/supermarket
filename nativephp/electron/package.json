@@ -19,14 +19,13 @@
         "build:win": "npm run build && electron-builder --win nsis --x64 --config electron-builder.mjs -p never",
         "publish:win": "npm run build && electron-builder --win nsis --x64 --config electron-builder.mjs -p always",
         "build:linux": "npm run build && electron-builder --linux AppImage --x64 --config electron-builder.mjs -p never",
-        "publish:linux": "npm run build && electron-builder --linux AppImage --x64 --config electron-builder.mjs -p always",
         "build:all": "npm run build:win",
         "publish": "npm run publish:win",
         "plugin:build": "rimraf electron-plugin/dist/ && node node_modules/typescript/bin/tsc --project electron-plugin",
         "plugin:build:watch": "npm run plugin:build -- -W",
         "plugin:test": "vitest run --root electron-plugin --coverage.all",
         "plugin:test:watch": "vitest watch --root electron-plugin --coverage.all"
-    }
+    },
     "dependencies": {
         "@electron-toolkit/preload": "^3.0.1",
         "@electron-toolkit/utils": "^4.0.0",

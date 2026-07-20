@@ -1,5 +1,8 @@
-`import { exec } from 'child_process';
+import { exec } from 'child_process';
 import { join } from 'path';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 const appUrl = process.env.APP_URL;
 const appId = process.env.NATIVEPHP_APP_ID;
@@ -77,8 +80,8 @@ export default {
             process.exit(1);
         }
 
-        console.log(`  • building php binary - exec php.js--${ targetOs } --${ arch } `);
-        exec(`node php.js--${ targetOs } --${ arch } `);
+        console.log(`  • building php binary - node php.js --${ targetOs } --${ arch }`);
+        await execAsync(`node php.js --${ targetOs } --${ arch }`);
     },
     afterSign: 'build/notarize.js',
     win: {
@@ -118,10 +121,10 @@ export default {
     //     artifactName: appName + '-${version}-${arch}.${ext}',
     // },
     linux: {
-    target: ['AppImage'],
-    maintainer: appAuthor,
-    category: 'Office',
-},
+        target: ['AppImage'],
+        maintainer: appAuthor,
+        category: 'Office',
+    },
     appImage: {
         artifactName: appName + '-${version}.${ext}',
     },
@@ -148,4 +151,3 @@ export default {
     ],
     ...(updaterEnabled ? { publish: updaterConfig } : {}),
 };
-`

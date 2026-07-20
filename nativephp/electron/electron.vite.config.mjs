@@ -1,5 +1,9 @@
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
-import { join } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+const electronPath = dirname(fileURLToPath(import.meta.url));
+const appPath = process.env.APP_PATH ?? join(electronPath, '..', '..');
 
 export default defineConfig({
     main: {
@@ -9,9 +13,7 @@ export default defineConfig({
                     {
                         name: 'watch-external',
                         buildStart() {
-                            this.addWatchFile(
-                                join(process.env.APP_PATH, 'app', 'Providers', 'NativeAppServiceProvider.php'),
-                            );
+                            this.addWatchFile(join(appPath, 'app', 'Providers', 'NativeAppServiceProvider.php'));
                         },
                     },
                 ],
