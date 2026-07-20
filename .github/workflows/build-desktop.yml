@@ -68,7 +68,12 @@ jobs:
           APP_VERSION="${APP_VERSION#v}"
           
           export NATIVEPHP_APP_VERSION=$APP_VERSION
-          php artisan native:build win
+          php artisan native:build win x64
+
+      - name: List Desktop Build Output
+        run: |
+          echo "nativephp/electron/dist:"
+          find nativephp/electron/dist -maxdepth 3 -type f -print || true
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
