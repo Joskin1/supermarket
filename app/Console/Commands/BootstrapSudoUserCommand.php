@@ -13,7 +13,7 @@ class BootstrapSudoUserCommand extends Command
 {
     protected $signature = 'users:bootstrap-sudo
         {email : Email address for the sudo user}
-        {--name=White-Mart Sudo : Display name for the sudo user}
+        {--name=System Administrator : Display name for the sudo user}
         {--password= : Password for the sudo user}';
 
     protected $description = 'Create or update the first sudo user with an explicitly supplied credential set';

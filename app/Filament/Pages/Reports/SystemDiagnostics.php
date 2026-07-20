@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages\Reports;
 
+use App\Support\BusinessProfile;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -71,7 +72,7 @@ class SystemDiagnostics extends Page
             return null;
         }
 
-        $defaultName = 'WhiteMart_Diagnostics_' . now()->format('Y_m_d_His') . '.zip';
+        $defaultName = BusinessProfile::diagnosticsFileName();
 
         // 2. Open Native Save Dialog if inside native app
         if (class_exists(\Native\Desktop\Facades\Dialog::class) && env('NATIVEPHP_RUNNING')) {

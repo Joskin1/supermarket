@@ -3,6 +3,8 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Auth\Login;
+use App\Http\Middleware\EnsureBusinessProfileIsComplete;
+use App\Support\BusinessProfile;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -33,7 +35,8 @@ class AdminPanelProvider extends PanelProvider
             // No SMTP available in offline mode. Password reset is handled
             // by the sudo user directly via the admin panel.
             ->viteTheme('resources/css/filament/admin/theme.css')
-            ->brandName(config('app.name'))
+            ->brandName(fn (): string => BusinessProfile::name())
+            ->brandLogo(fn (): ?string => BusinessProfile::logoUrl())
             ->font('Inter')
             ->maxContentWidth('full')
             ->sidebarCollapsibleOnDesktop()
@@ -73,6 +76,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                EnsureBusinessProfileIsComplete::class,
             ]);
     }
 }

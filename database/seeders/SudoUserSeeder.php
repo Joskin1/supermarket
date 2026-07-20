@@ -10,7 +10,7 @@ use InvalidArgumentException;
 
 class SudoUserSeeder extends Seeder
 {
-    private const DEFAULT_NAME = 'White-Mart Sudo';
+    private const DEFAULT_NAME = 'System Administrator';
 
     public function run(): void
     {

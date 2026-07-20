@@ -23,7 +23,7 @@ abstract class BaseReportPage extends Page
 
     public function getSubheading(): string|Htmlable|null
     {
-        return 'Simple, trustworthy reporting for daily White-Mart decisions.';
+        return 'Simple, trustworthy reporting for daily business decisions.';
     }
 
     public function formatCurrency(float|int|string|null $amount): string

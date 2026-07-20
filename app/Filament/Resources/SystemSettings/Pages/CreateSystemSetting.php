@@ -18,6 +18,7 @@ class CreateSystemSetting extends CreateRecord
             ...$data,
             'singleton_key' => SystemSetting::SINGLETON_KEY,
         ]);
+        $record->markBusinessProfileComplete();
 
         app(RecordActivityAction::class)->execute(
             event: 'system_settings.created',
@@ -25,9 +26,12 @@ class CreateSystemSetting extends CreateRecord
             subject: $record,
             properties: $record->only([
                 'business_name',
+                'business_type',
                 'business_timezone',
                 'currency_code',
                 'low_stock_contact_email',
+                'business_phone',
+                'business_email',
             ]),
         );
 

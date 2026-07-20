@@ -2,15 +2,16 @@
 
 namespace App\Providers;
 
+use App\Events\Desktop\BackupShortcutPressed;
+use App\Events\Desktop\InventoryShortcutPressed;
+use App\Events\Desktop\NewSaleShortcutPressed;
+use App\Services\Desktop\BackupService;
+use App\Support\BusinessProfile;
+use Illuminate\Support\Facades\Event;
 use Native\Desktop\Contracts\ProvidesPhpIni;
 use Native\Desktop\Facades\GlobalShortcut;
 use Native\Desktop\Facades\Menu;
 use Native\Desktop\Facades\Window;
-use Illuminate\Support\Facades\Event;
-use App\Events\Desktop\BackupShortcutPressed;
-use App\Events\Desktop\NewSaleShortcutPressed;
-use App\Events\Desktop\InventoryShortcutPressed;
-use App\Services\Desktop\BackupService;
 use Native\Desktop\Windows\Window as NativeWindow;
 
 class NativeAppServiceProvider implements ProvidesPhpIni
@@ -21,14 +22,47 @@ class NativeAppServiceProvider implements ProvidesPhpIni
      */
     public function boot(): void
     {
+        $this->ensureStorageLink();
         $this->createMainWindow();
         $this->createApplicationMenu();
         $this->registerGlobalShortcuts();
         $this->registerShortcutListeners();
-        $this->bootstrapProductionDatabase();
+        $this->bootstrapLocalDatabase();
         $this->cacheApplication();
         $this->registerUpdateListeners();
         $this->checkForUpdatesOnStartup();
+    }
+
+    /**
+     * Ensure the public/storage → storage/app/public symlink exists.
+     *
+     * NativePHP desktop apps do not automatically create this symlink,
+     * but the local disk's 'serve' route and any public file serving
+     * depends on it. This is safe to call on every boot — it no-ops
+     * when the link already exists.
+     */
+    protected function ensureStorageLink(): void
+    {
+        try {
+            $link = public_path('storage');
+            $target = storage_path('app/public');
+
+            if (! is_dir($target)) {
+                @mkdir($target, 0755, true);
+            }
+
+            if (! file_exists($link)) {
+                // On Windows, PHP's symlink() may fail without admin privileges.
+                // Fall back to a directory junction which works for unprivileged users.
+                if (PHP_OS_FAMILY === 'Windows') {
+                    exec('mklink /J "' . $link . '" "' . $target . '"');
+                } else {
+                    symlink($target, $link);
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Storage link creation failed: ' . $e->getMessage());
+        }
     }
 
     protected function cacheApplication(): void
@@ -44,26 +78,22 @@ class NativeAppServiceProvider implements ProvidesPhpIni
         }
     }
 
-    protected function bootstrapProductionDatabase(): void
+    protected function bootstrapLocalDatabase(): void
     {
         try {
             if (! \Illuminate\Support\Facades\Schema::hasTable('users')) {
                 \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
             }
 
-            if (\App\Models\User::count() === 0) {
+            if (\Illuminate\Support\Facades\Schema::hasTable('roles')) {
                 \Illuminate\Support\Facades\Artisan::call('db:seed', [
                     '--class' => \Database\Seeders\RoleSeeder::class,
                     '--force' => true,
                 ]);
+            }
 
-                $user = \App\Models\User::create([
-                    'name' => 'Store Admin',
-                    'email' => 'whitemart@gmail.com',
-                    'password' => \Illuminate\Support\Facades\Hash::make('whitemart@gmail.com'),
-                    'email_verified_at' => now(),
-                ]);
-                $user->syncRoles([\App\Enums\RoleEnum::SUDO->value]);
+            if (\Illuminate\Support\Facades\Schema::hasTable('system_settings')) {
+                \App\Models\SystemSetting::current();
             }
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Database Bootstrap Error: ' . $e->getMessage());
@@ -112,7 +142,7 @@ class NativeAppServiceProvider implements ProvidesPhpIni
     protected function createMainWindow(): void
     {
         Window::open('main')
-            ->title(config('app.name', 'White-Mart'))
+            ->title(BusinessProfile::name())
             ->width(1280)
             ->height(800)
             ->minWidth(1024)
@@ -154,7 +184,7 @@ class NativeAppServiceProvider implements ProvidesPhpIni
 
             try {
                 \Native\Desktop\Facades\Notification::title('Update Available')
-                    ->message("A new supermarket update is available (v{$event->version})! Open the app settings to download it.")
+                    ->message("A new inventory system update is available (v{$event->version}). Open the app settings to download it.")
                     ->show();
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Desktop Notification Failed: ' . $e->getMessage());

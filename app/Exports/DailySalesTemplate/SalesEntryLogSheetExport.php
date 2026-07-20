@@ -261,7 +261,7 @@ class SalesEntryLogSheetExport implements FromArray, ShouldAutoSize, WithEvents,
     protected function applyTimeColumnComment(Worksheet $sheet): void
     {
         $comment = $sheet->getComment('B1');
-        $comment->setAuthor((string) config('app.name', 'White-Mart'));
+        $comment->setAuthor((string) config('app.name', 'Inventory Manager'));
         $comment->getText()->createTextRun('Enter the sale time manually as a fixed hh:mm value.');
     }
 

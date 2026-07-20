@@ -2,6 +2,8 @@
 
 namespace App\Services\Desktop;
 
+use App\Support\BusinessProfile;
+
 /**
  * Wrapper around NativePHP's printing capabilities.
  *
@@ -58,7 +60,7 @@ class PrintService
      */
     public function formatReceipt(array $receiptData): string
     {
-        $businessName = $receiptData['business_name'] ?? 'White-Mart';
+        $businessName = $receiptData['business_name'] ?? BusinessProfile::name();
         $date = $receiptData['date'] ?? now()->format('Y-m-d H:i:s');
         $items = $receiptData['items'] ?? [];
         $total = $receiptData['total'] ?? 0;

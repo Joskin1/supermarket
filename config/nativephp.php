@@ -13,7 +13,7 @@ return [
      * usually in the form of a reverse domain name.
      * For example: com.nativephp.app
      */
-    'app_id' => env('NATIVEPHP_APP_ID', 'com.whitemart.desktop'),
+    'app_id' => env('NATIVEPHP_APP_ID', 'com.inventorymanager.desktop'),
 
     /**
      * If your application allows deep linking, you can specify the scheme
@@ -24,27 +24,27 @@ return [
      * This would allow you to open your application using a URL like:
      * nativephp://some/path
      */
-    'deeplink_scheme' => env('NATIVEPHP_DEEPLINK_SCHEME', 'whitemart'),
+    'deeplink_scheme' => env('NATIVEPHP_DEEPLINK_SCHEME', 'inventorymanager'),
 
     /**
      * The author of your application.
      */
-    'author' => env('NATIVEPHP_APP_AUTHOR', 'White-Mart'),
+    'author' => env('NATIVEPHP_APP_AUTHOR', 'Inventory Manager'),
 
     /**
      * The copyright notice for your application.
      */
-    'copyright' => env('NATIVEPHP_APP_COPYRIGHT', '© 2026 White-Mart'),
+    'copyright' => env('NATIVEPHP_APP_COPYRIGHT', '© 2026 Inventory Manager'),
 
     /**
      * The description of your application.
      */
-    'description' => env('NATIVEPHP_APP_DESCRIPTION', 'White-Mart Supermarket Management System'),
+    'description' => env('NATIVEPHP_APP_DESCRIPTION', 'Inventory management system for retail businesses'),
 
     /**
      * The Website of your application.
      */
-    'website' => env('NATIVEPHP_APP_WEBSITE', 'https://whitemart.app'),
+    'website' => env('NATIVEPHP_APP_WEBSITE', 'https://inventorymanager.app'),
 
     /**
      * The default service provider for your application. This provider

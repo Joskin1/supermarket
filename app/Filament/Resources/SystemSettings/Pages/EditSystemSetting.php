@@ -14,6 +14,7 @@ class EditSystemSetting extends EditRecord
     protected function handleRecordUpdate(Model $record, array $data): Model
     {
         $updatedRecord = parent::handleRecordUpdate($record, $data);
+        $updatedRecord->markBusinessProfileComplete();
 
         app(RecordActivityAction::class)->execute(
             event: 'system_settings.updated',
@@ -21,9 +22,12 @@ class EditSystemSetting extends EditRecord
             subject: $updatedRecord,
             properties: $updatedRecord->only([
                 'business_name',
+                'business_type',
                 'business_timezone',
                 'currency_code',
                 'low_stock_contact_email',
+                'business_phone',
+                'business_email',
             ]),
         );
 
