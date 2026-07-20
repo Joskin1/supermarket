@@ -23,3 +23,13 @@ Schedule::command('backups:create --note="Scheduled daily backup"')
     ->withoutOverlapping()
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/backup-schedule.log'));
+
+Schedule::call(function () {
+    if (config('nativephp-internal.running') || env('NATIVEPHP_RUNNING', false)) {
+        try {
+            \Native\Desktop\Facades\AutoUpdater::checkForUpdates();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Scheduled AutoUpdater check failed: ' . $e->getMessage());
+        }
+    }
+})->everyThirtyMinutes();

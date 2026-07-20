@@ -179,12 +179,12 @@ class NativeAppServiceProvider implements ProvidesPhpIni
         if (! env('NATIVEPHP_RUNNING', false)) return;
 
         Event::listen(\Native\Desktop\Events\AutoUpdater\UpdateAvailable::class, function ($event) {
-            \Illuminate\Support\Facades\Cache::put('update_download_status', 'available');
+            \Illuminate\Support\Facades\Cache::put('update_download_status', 'downloading');
             \Illuminate\Support\Facades\Cache::put('latest_version_available', $event->version);
 
             try {
-                \Native\Desktop\Facades\Notification::title('Update Available')
-                    ->message("A new inventory system update is available (v{$event->version}). Open the app settings to download it.")
+                \Native\Desktop\Facades\Notification::title('Update Found')
+                    ->message("A new system update (v{$event->version}) is downloading in the background. You may continue working.")
                     ->show();
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Desktop Notification Failed: ' . $e->getMessage());
@@ -202,7 +202,7 @@ class NativeAppServiceProvider implements ProvidesPhpIni
 
             try {
                 \Native\Desktop\Facades\Notification::title('Update Ready')
-                    ->message('The new update has been downloaded and is ready to install! Open app settings to restart.')
+                    ->message('The update has been downloaded and will install automatically when you restart the application.')
                     ->show();
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Desktop Notification Failed: ' . $e->getMessage());
