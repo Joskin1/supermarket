@@ -25,11 +25,16 @@ fi
 VERSION="${1:-}"
 
 if [[ -z "$VERSION" ]]; then
-    VERSION="$(php -r '$config = require "config/nativephp.php"; echo $config["version"];')"
+    VERSION="$(php -r '$contents = file_get_contents("config/nativephp.php"); preg_match("/'\''version'\''\s*=>\s*'\''([^'\'']+)'\''/", $contents, $matches); echo $matches[1] ?? "";')"
 fi
 
 TAG="v${VERSION#v}"
 PACKAGE_VERSION="$(node -p "require('./nativephp/electron/package.json').version")"
+
+if [[ -z "${TAG#v}" ]]; then
+    echo "Could not read the NativePHP app version from config/nativephp.php."
+    exit 1
+fi
 
 if [[ "$PACKAGE_VERSION" != "${TAG#v}" ]]; then
     echo "Version mismatch:"
