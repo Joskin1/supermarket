@@ -4,6 +4,54 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+read_nativephp_version() {
+    php -r '$contents = file_get_contents("config/nativephp.php"); preg_match("/'\''version'\''\s*=>\s*'\''([^'\'']+)'\''/", $contents, $matches); echo $matches[1] ?? "";'
+}
+
+bump_patch_version() {
+    local current_version="$1"
+
+    php -r '
+        $version = $argv[1];
+        $parts = explode(".", $version);
+
+        if (count($parts) !== 3 || array_filter($parts, fn ($part) => ! ctype_digit($part))) {
+            fwrite(STDERR, "Expected semantic version like 1.0.28, got {$version}.\n");
+            exit(1);
+        }
+
+        $parts[2] = (string) (((int) $parts[2]) + 1);
+        echo implode(".", $parts);
+    ' "$current_version"
+}
+
+write_release_version() {
+    local version="$1"
+
+    php -r '
+        $version = $argv[1];
+
+        $configPath = "config/nativephp.php";
+        $config = file_get_contents($configPath);
+        $config = preg_replace("/('\''version'\''\s*=>\s*'\'')[^'\'']+('\'',)/", "\${1}{$version}\${2}", $config, 1);
+        file_put_contents($configPath, $config);
+
+        foreach (["nativephp/electron/package.json", "nativephp/electron/package-lock.json"] as $path) {
+            $json = json_decode(file_get_contents($path), true);
+            $json["version"] = $version;
+
+            if (isset($json["packages"][""])) {
+                $json["packages"][""]["version"] = $version;
+            }
+
+            file_put_contents(
+                $path,
+                json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL
+            );
+        }
+    ' "$version"
+}
+
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "This command must be run inside the git repository."
     exit 1
@@ -15,6 +63,7 @@ if [[ -n "$(git status --porcelain)" ]]; then
     exit 1
 fi
 
+MODE="${1:-}"
 BRANCH="$(git branch --show-current)"
 
 if [[ -z "$BRANCH" ]]; then
@@ -22,10 +71,21 @@ if [[ -z "$BRANCH" ]]; then
     exit 1
 fi
 
-VERSION="${1:-}"
+if [[ "$MODE" == "--bump-patch" ]]; then
+    CURRENT_VERSION="$(read_nativephp_version)"
+    VERSION="$(bump_patch_version "$CURRENT_VERSION")"
+
+    echo "Bumping Windows release version: $CURRENT_VERSION -> $VERSION"
+    write_release_version "$VERSION"
+
+    git add config/nativephp.php nativephp/electron/package.json nativephp/electron/package-lock.json
+    git commit -m "chore: release v$VERSION"
+else
+    VERSION="$MODE"
+fi
 
 if [[ -z "$VERSION" ]]; then
-    VERSION="$(php -r '$contents = file_get_contents("config/nativephp.php"); preg_match("/'\''version'\''\s*=>\s*'\''([^'\'']+)'\''/", $contents, $matches); echo $matches[1] ?? "";')"
+    VERSION="$(read_nativephp_version)"
 fi
 
 TAG="v${VERSION#v}"

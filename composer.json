@@ -95,6 +95,9 @@
         ],
         "release:windows": [
             "bash scripts/release-windows.sh"
+        ],
+        "release:windows:patch": [
+            "bash scripts/release-windows.sh --bump-patch"
         ]
     },
     "extra": {

@@ -37,6 +37,14 @@ composer release:windows
 
 The command pushes your current branch, creates a matching version tag like `v1.0.28`, and pushes that tag. GitHub Actions will then run `.github/workflows/build-desktop.yml` on `windows-latest`, build the NativePHP Windows installer, and attach only Windows release files to the GitHub Release.
 
+To automatically increase the patch version first, run:
+
+```bash
+composer release:windows:patch
+```
+
+For example, this changes `1.0.28` to `1.0.29`, commits the version bump, creates `v1.0.29`, pushes the branch, and pushes the tag.
+
 ## Manual Release Build
 
 You can also start the same workflow from GitHub Actions using **Build Desktop App -> Run workflow**. Manual runs upload the Windows installer as a workflow artifact. Tagged runs also create a GitHub Release.
